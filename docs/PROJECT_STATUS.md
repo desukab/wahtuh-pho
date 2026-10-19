@@ -60,19 +60,20 @@ that should stay open whether it is built on by hobbyists or companies.
 | `wahtuh-audio` (PCM, chunker, bounded buffer) | Scaffolded + tested (12 unit tests) |
 | `wahtuh-transcribe` (`Engine` trait, `MockEngine`, **`WhisperCppEngine`**) | Real local engine via whisper-rs 0.16.0 (whisper.cpp v1.8.3 bundled); `$WAHTUH_MODEL_PATH` / `~/.cache/wahtuh/models/`; abort-callback cancellation; zero network in local path. 10 unit tests (3 whisper tests skip cleanly without a model). `LocalEngine` stub retained for its loud-failure contract |
 | `wahtuh-normalize` (cleanup, Telugu preservation, dictionary) | Scaffolded + tested (11 unit tests) |
-| `wahtuh-providers` (Groq/Gemini/OpenAI adapters) | Scaffolded + tested (16 unit tests). No HTTP transport (std-only); unreachable when `local_only` |
+| `wahtuh-providers` (Groq/Gemini/OpenAI/Deepgram adapters) | Scaffolded + tested (20 unit tests). No HTTP transport (std-only); unreachable when `local_only`. Deepgram `nova-3` adapter added 2026-10-19 (`Authorization: Token` scheme, `te`/`en`/`multi` language allow-list) — **live benchmark blocked: stored API key rejected with 401, reconnect needed** |
 | `wahtuh-config` (config + local-only guarantee) | Scaffolded + tested (9 unit tests) |
 | `wahtuh-core` (session, history) | Scaffolded + tested (10 unit + 6 integration tests) |
 | `wahtuh-jni` Android bridge | Not started (design in `docs/ANDROID.md` only) |
 | Android app shell | Not started |
-| Evaluation / benchmarks | **Measured 2026-10-19:** 93 runs (3 models × 31 clips). EN WER tiny 13.9% / base 11.8% / small 7.5%; TE 117–128% WER (all models fail Telugu — see Blockers). `docs/EVALUATION.md` + raw `docs/bench_runs_{tiny,base,small}.jsonl` |
+| Evaluation / benchmarks | **Measured 2026-10-19:** 93 runs (3 models × 31 clips). EN WER tiny 13.9% / base 11.8% / small 7.5%; TE 117–128% WER (all models fail Telugu — see Blockers). `docs/EVALUATION.md` + raw `docs/bench_runs_{tiny,base,small}.jsonl`. **Deepgram head-to-head planned:** same 31 clips via `nova-3` (`te`/`en`/`multi`) — blocked on API key reconnect |
+| Deepgram connector (`custom.deepgram`) | Connector doc + `bin/deepgram_listen.py` helper authored 2026-10-19. Auth check failed: Deepgram returned 401 `INVALID_AUTH` — the stored key is invalid, not a placement bug (surrogate was attached correctly). Reconnect with a fresh key required before any live call |
 | GitHub repo `desukab/wahtuh-pho` | **Published** 2026-10-19 (4 API commits). `.github/workflows/ci.yml` still missing — needs manual upload (App lacks `workflows` permission) |
 | Competitor teardown (user's licensed APK, static only) | **Done 2026-10-19:** `docs/ANDROID_UX_TEARDOWN.md` (screen inventory, onboarding state machine, bubble states, permission patterns), `docs/COMPETITOR_ARCHITECTURE.md` (gRPC streaming client, a11y+IME insertion engine, FGS/watchdog keepalive, SDK inventory), `docs/FEATURE_PARITY.md` corrected with app-grounded evidence. Raw decompiled output quarantined at `~/workspace/analysis/wisprflow/` (never in repo). |
 | UI direction | **Decided 2026-10-19:** retro 8-bit games vibe for UI/UX chrome and feedback; typeface Fredoka (Latin) + Baloo Tammudu 2 (Telugu companion) — NOT pixel fonts. Concept: `docs/UI_CONCEPT_8BIT.md` |
 
 ## Blockers
 
-1. **Telugu transcription is effectively unusable with whisper tiny/base/small** (measured 117–128% mean WER on the FLEURS Telugu subset; hypotheses are script gibberish/hallucinations). Do NOT ship or claim Telugu support on these models. Open: try `large` variants, or evaluate sherpa-onnx/Vosk for Telugu.
+1. **Telugu transcription is effectively unusable with whisper tiny/base/small** (measured 117–128% mean WER on the FLEURS Telugu subset; hypotheses are script gibberish/hallucinations). Do NOT ship or claim Telugu support on these models. Open: try `large` variants, sherpa-onnx/Vosk — or **Deepgram Nova-3** (`te`/`multi`), which is the fastest path to a Telugu answer. Deepgram benchmark is implemented and ready but **blocked: the stored API key was rejected (401 `INVALID_AUTH`) — user must reconnect with a fresh key**.
 2. **No ARM64 Android device** — the only latency/RSS numbers that matter for the ship decision cannot be measured yet.
 3. **No Android SDK/NDK** in this environment — required before the JNI bridge or any Android build.
 4. **Code-switching not evaluated** — no Telugu-English code-switch clips in the corpus; nothing was invented to fill the gap.
@@ -82,6 +83,7 @@ that should stay open whether it is built on by hobbyists or companies.
 ## Next steps (in order)
 
 1. Upload `.github/workflows/ci.yml` manually via the GitHub web UI (one file, content in local repo).
-2. Investigate Telugu: benchmark whisper `large` (or `large-v3-turbo` when available in ggml) and/or sherpa-onnx models on the Telugu subset before any Telugu claim.
+2. **Deepgram:** user reconnects the API key (fresh key via the secure flow); then run the head-to-head benchmark (same 31 FLEURS clips, `nova-3` `te`/`en`/`multi`) and record WER/CER/latency/cost in `docs/EVALUATION.md`. This is the fastest open question: is Telugu solved by the cloud tier?
+3. Investigate Telugu locally: benchmark whisper `large` (or `large-v3-turbo` when available in ggml) and/or sherpa-onnx models on the Telugu subset before any Telugu claim.
 3. Install Android SDK/NDK; build the `wahtuh-jni` bridge; measure on an ARM64 device.
 4. Then: Android app shell, text-insertion spike, provider opt-in transport.

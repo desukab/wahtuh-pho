@@ -30,6 +30,8 @@ verified stays **out** of the allow-list — we never invent model names.
 | Gemini | `gemini-3.8-flash` supports audio input + `generateContent` | Google Cloud model docs: https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-8-flash (Modalities: Audio input; APIs: GenerateContent supported) | 2026-10-19 | ✅ verified |
 | Gemini | `gemini-2.5-flash` used for audio transcription via inline data / Files API | Published walkthrough using the official `google-genai` SDK: https://dzone.com/articles/mastering-audio-transcription-with-gemini-apis | 2026-10-19 | ⚠️ verified usage, but **legacy** — see caveat below |
 | OpenAI | Per-minute pricing | Not found on official docs during this check | 2026-10-19 | ❌ unverified — check OpenAI's pricing page |
+| Deepgram | Model `nova-3`; endpoint `POST https://api.deepgram.com/v1/listen` (raw WAV body, `Content-Type: audio/wav`, `Authorization: Token <key>`); languages `te`, `en`, `multi` (multilingual/code-switching); `smart_format` option | Deepgram pre-recorded docs: https://developers.deepgram.com/docs/pre-recorded-audio ; Telugu: https://deepgram.com/product/speech-to-text/telugu ; pricing via third-party summaries of the official pricing page | 2026-10-19 | ✅ verified (endpoint shape from docs; **live call blocked — stored API key rejected with 401, reconnect needed**) |
+| Deepgram | Per-minute pricing: $0.0043/min mono, $0.0052/min multi (pre-recorded Nova-3) | Third-party summaries of Deepgram's pricing page (brasstranscripts.com, anygen.io) | 2026-10-19 | ⚠️ from secondary sources — recheck Deepgram's pricing page before budgeting |
 | Gemini | Per-token/per-minute pricing | Not found on official docs during this check | 2026-10-19 | ❌ unverified — check Google's pricing page |
 
 **Gemini 2.5 caveat (2026-10):** multiple reports indicate Google is
@@ -97,6 +99,39 @@ keys that still have access, but expect it to stop working for new keys.
 - **Response:** transcript at
   `candidates[0].content.parts[0].text`.
 
+## Deepgram
+
+- **Where to get a key:** the Deepgram console → *API Keys*. The account
+  used for this project carries $200 in credits (user-funded, 2026-10-19).
+- **Endpoint:** `POST https://api.deepgram.com/v1/listen`, raw WAV bytes as
+  the request body, `Content-Type: audio/wav`, header
+  `Authorization: Token <key>` — note this is the **`Token` scheme, not
+  `Bearer`**. Query parameters: `model=nova-3`, `language=te|en|multi`,
+  `smart_format=true`.
+- **Supported models** (verified 2026-10-19): `nova-3`.
+- **Supported languages** (verified 2026-10-19): `te` (Telugu), `en`
+  (English), `multi` (Deepgram's multilingual mode, which handles
+  code-switching). The adapter validates the language against this
+  allow-list and rejects anything else with `InvalidLanguage` — this also
+  prevents query-string injection, since the language goes in the URL.
+- **Response:** transcript at
+  `results.channels[0].alternatives[0].transcript`.
+- **Pricing** (secondary sources, recheck before budgeting): $0.0043/min
+  monolingual, $0.0052/min multilingual (pre-recorded Nova-3). At those
+  rates $200 buys roughly 775 hours of monolingual transcription; the
+  project's 31-clip benchmark corpus is a few minutes of audio — a few
+  cents per full run.
+- **Business role:** Deepgram is the *premium cloud tier*. The local
+  whisper path stays the default (near-zero marginal cost, offline);
+  Deepgram is opt-in for users who want maximum accuracy — particularly
+  for Telugu, where local tiny/base/small models measured 117–128% WER.
+- **Status 2026-10-19:** adapter implemented and unit-tested
+  (`DeepgramAdapter`, 20 provider tests green). **Live benchmark blocked:**
+  the stored API key was rejected by Deepgram with 401 `INVALID_AUTH` on
+  the first authenticated call; a reconnect with a fresh key is needed
+  before any live transcription runs. Connector doc:
+  `~/workspace/custom-connectors/custom.deepgram/CONNECTOR.md`.
+
 ## Upload disclosure
 
 When you use a cloud provider, **your audio is uploaded to that provider**
@@ -157,6 +192,7 @@ privacy story clean: cleanup would be a second, distinct data use.)
 |---|---|
 | `MissingKey` | No API key supplied at runtime |
 | `InvalidModel(String)` | Model not in the verified allow-list |
+| `InvalidLanguage(String)` | Language code not accepted by this adapter (Deepgram only) |
 | `TransportNotConfigured` | No HTTP transport linked (current std-only build) |
 | `HttpError(u16)` | Provider returned an HTTP error status |
 | `RateLimited` | HTTP 429 — back off and retry |
@@ -175,7 +211,8 @@ failures identically.
 2. Add the names to that adapter's `supported_models()` — nothing
    unverified goes in.
 3. Add/extend the typed request struct (`GroqTranscribeRequest`,
-   `GeminiTranscribeRequest`, `OpenAITranscribeRequest`) and its
+   `GeminiTranscribeRequest`, `OpenAITranscribeRequest`,
+   `DeepgramTranscribeRequest`) and its
    `build_http`, keeping keys as `&str` parameters and out of `Debug`
    output.
 4. Extend the unit tests: allow-list equality, request shape, and the

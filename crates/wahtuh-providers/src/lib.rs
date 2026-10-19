@@ -156,6 +156,11 @@ pub enum ProviderError {
     /// The requested model is not in [`Provider::supported_models`]. Carries
     /// the rejected model id.
     InvalidModel(String),
+    /// The requested language code is not accepted by this adapter. Carries
+    /// the rejected code. Adapters that place the language in the request
+    /// URL (Deepgram) validate it to prevent query-string injection; others
+    /// pass the hint through untouched.
+    InvalidLanguage(String),
     /// The adapter is compiled but no HTTP transport is linked yet. Returned
     /// by [`Provider::transcribe`] in the std-only build; use
     /// [`Provider::build_request`] to get the request a transport would send.
@@ -206,6 +211,7 @@ impl fmt::Display for ProviderError {
                 write!(f, "no API key supplied (keys are runtime-only; see module docs)")
             }
             ProviderError::InvalidModel(m) => write!(f, "unsupported model: {m}"),
+            ProviderError::InvalidLanguage(l) => write!(f, "unsupported language: {l}"),
             ProviderError::TransportNotConfigured => write!(
                 f,
                 "no HTTP transport linked (std-only build); use Provider::build_request \
@@ -388,20 +394,24 @@ fn unescape_json_string(s: &str) -> Option<String> {
     Some(out)
 }
 
-/// Extract the value of the first `"text"` string field in a JSON document.
+/// Extract the value of the first string-valued field with the given JSON
+/// key (key must include its quotes, e.g. `"\"text\""`).
 ///
 /// Both the Whisper-compatible `{"text": "..."}` shape (Groq, OpenAI with
 /// `response_format=json`) and Gemini's
 /// `candidates[0].content.parts[0].text` shape carry the transcript in a
 /// `"text"` field, so one tolerant extractor serves all three adapters.
-/// Returns `None` when no string-valued `"text"` field is found.
-fn extract_text_field(body: &[u8]) -> Option<String> {
+/// Deepgram instead uses `"transcript"` (see
+/// [`extract_transcript_field`]). Returns `None` when no string-valued
+/// field with that key is found.
+fn extract_string_field(body: &[u8], field: &str) -> Option<String> {
     let text = std::str::from_utf8(body).ok()?;
     let bytes = text.as_bytes();
+    let key = field.as_bytes();
     let mut i = 0;
-    while i + 6 <= bytes.len() {
-        if &bytes[i..i + 6] == b"\"text\"" {
-            let mut j = skip_ws(bytes, i + 6);
+    while i + key.len() <= bytes.len() {
+        if &bytes[i..i + key.len()] == key {
+            let mut j = skip_ws(bytes, i + key.len());
             if bytes.get(j) != Some(&b':') {
                 i += 1;
                 continue;
@@ -433,6 +443,16 @@ fn extract_text_field(body: &[u8]) -> Option<String> {
         i += 1;
     }
     None
+}
+
+fn extract_text_field(body: &[u8]) -> Option<String> {
+    extract_string_field(body, "\"text\"")
+}
+
+/// Extract Deepgram's transcript: the first `"transcript"` string field in
+/// the `/v1/listen` response (`results.channels[].alternatives[].transcript`).
+fn extract_transcript_field(body: &[u8]) -> Option<String> {
+    extract_string_field(body, "\"transcript\"")
 }
 
 /// Parse a Whisper-compatible JSON transcription response
@@ -809,12 +829,131 @@ impl Provider for OpenAiAdapter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Deepgram
+// ---------------------------------------------------------------------------
+
+/// Typed Deepgram transcription request, derived from the common
+/// [`TranscriptionRequest`] by [`DeepgramAdapter::to_typed`].
+///
+/// `POST https://api.deepgram.com/v1/listen` with the raw WAV as the
+/// request body (`Content-Type: audio/wav`), per Deepgram's pre-recorded
+/// API docs. Authentication is `Authorization: Token <key>` — note this is
+/// **not** the `Bearer` scheme the other adapters use.
+#[derive(Debug, Clone)]
+pub struct DeepgramTranscribeRequest {
+    /// Verified model id, e.g. `"nova-3"`.
+    pub model: String,
+    /// 16-bit PCM WAV payload (what gets uploaded).
+    pub audio_wav: Vec<u8>,
+    /// Deepgram language code: ISO-639-1 (`"te"`, `"en"`) or `"multi"`
+    /// for Deepgram's multilingual / code-switching mode.
+    pub language: Option<String>,
+}
+
+impl DeepgramTranscribeRequest {
+    /// Build the documented HTTP request. `api_key` is used only to set the
+    /// `Authorization: Token <key>` header and is never stored.
+    pub fn build_http(&self, api_key: &str) -> HttpRequest {
+        let mut url = format!(
+            "{}?model={}&smart_format=true",
+            DeepgramAdapter::LISTEN_URL,
+            self.model
+        );
+        if let Some(lang) = &self.language {
+            // `lang` was validated against SUPPORTED_LANGUAGES in
+            // `DeepgramAdapter::validate`, so plain concatenation cannot
+            // inject extra query parameters.
+            url.push_str("&language=");
+            url.push_str(lang);
+        }
+        HttpRequest {
+            method: "POST",
+            url,
+            headers: vec![
+                ("Authorization".to_string(), format!("Token {api_key}")),
+                ("Content-Type".to_string(), "audio/wav".to_string()),
+            ],
+            body: self.audio_wav.clone(),
+        }
+    }
+}
+
+/// Deepgram adapter (opt-in). Verified model below; see `docs/PROVIDERS.md`
+/// for the documentation source and check date.
+pub struct DeepgramAdapter;
+
+impl DeepgramAdapter {
+    /// `POST` endpoint per Deepgram's pre-recorded speech-to-text docs.
+    pub const LISTEN_URL: &'static str = "https://api.deepgram.com/v1/listen";
+
+    /// Language codes this adapter accepts. `"multi"` is Deepgram's
+    /// multilingual mode (handles code-switching); the monolingual codes
+    /// are the ones we benchmark. The allow-list doubles as query-string
+    /// injection protection (see `DeepgramTranscribeRequest::build_http`).
+    pub const SUPPORTED_LANGUAGES: &'static [&'static str] = &["te", "en", "multi"];
+
+    /// Convert the common request into the typed Deepgram request
+    /// (validates first). The WAV encoding is what would be uploaded.
+    pub fn to_typed(
+        &self,
+        req: &TranscriptionRequest,
+    ) -> Result<DeepgramTranscribeRequest, ProviderError> {
+        self.validate(req)?;
+        Ok(DeepgramTranscribeRequest {
+            model: req.model.clone(),
+            audio_wav: encode_wav_pcm16(&req.audio, req.sample_rate),
+            language: req.language.clone(),
+        })
+    }
+
+    /// Parse Deepgram's `/v1/listen` JSON response, extracting the
+    /// transcript from `results.channels[].alternatives[].transcript`.
+    pub fn parse_response(&self, body: &[u8]) -> Result<TranscriptionResponse, ProviderError> {
+        match extract_transcript_field(body) {
+            Some(text) => Ok(TranscriptionResponse {
+                text,
+                language: None,
+            }),
+            None => Err(ProviderError::ProviderMessage(format!(
+                "unrecognized Deepgram response ({} bytes, no \"transcript\" field)",
+                body.len()
+            ))),
+        }
+    }
+}
+
+impl Provider for DeepgramAdapter {
+    fn name(&self) -> &'static str {
+        "deepgram"
+    }
+
+    fn supported_models(&self) -> Vec<String> {
+        vec!["nova-3".to_string()]
+    }
+
+    fn validate(&self, req: &TranscriptionRequest) -> Result<(), ProviderError> {
+        validate_against(self, req)?;
+        if let Some(lang) = &req.language {
+            if !Self::SUPPORTED_LANGUAGES.contains(&lang.as_str()) {
+                return Err(ProviderError::InvalidLanguage(lang.clone()));
+            }
+        }
+        Ok(())
+    }
+
+    fn build_request(&self, req: &TranscriptionRequest) -> Result<HttpRequest, ProviderError> {
+        Ok(self.to_typed(req)?.build_http(req.api_key()))
+    }
+}
+
 /// All adapters behind one enum for settings UIs.
 pub fn all_providers() -> Vec<Box<dyn Provider>> {
     vec![
         Box::new(GroqAdapter),
         Box::new(GeminiAdapter),
         Box::new(OpenAiAdapter),
+        Box::new(DeepgramAdapter),
     ]
 }
 
@@ -880,6 +1019,7 @@ mod tests {
                 "gpt-4o-transcribe-diarize",
             ]
         );
+        assert_eq!(DeepgramAdapter.supported_models(), vec!["nova-3"]);
     }
 
     #[test]
@@ -1148,7 +1288,7 @@ mod tests {
     #[test]
     fn all_providers_listed() {
         let names: Vec<&str> = all_providers().iter().map(|p| p.name()).collect();
-        assert_eq!(names, vec!["groq", "gemini", "openai"]);
+        assert_eq!(names, vec!["groq", "gemini", "openai", "deepgram"]);
         // The trait's common interface works through the box.
         for p in all_providers() {
             assert!(!p.supported_models().is_empty());
@@ -1162,6 +1302,96 @@ mod tests {
             assert!(p.validate(&req).is_ok());
             assert!(p.build_request(&req).is_ok());
         }
+    }
+
+    #[test]
+    fn deepgram_build_request_matches_documented_shape() {
+        let adapter = DeepgramAdapter;
+        let req = TranscriptionRequest::new(audio(), 16_000, "nova-3", "dg-key")
+            .unwrap()
+            .with_language("te");
+        let http = adapter.build_request(&req).unwrap();
+        assert_eq!(http.method, "POST");
+        assert_eq!(
+            http.url,
+            "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&language=te"
+        );
+        // Deepgram uses `Token`, not `Bearer`.
+        assert_eq!(http.header("Authorization"), Some("Token dg-key"));
+        assert_eq!(http.header("Content-Type"), Some("audio/wav"));
+        // The body is the raw WAV (not multipart, not JSON).
+        assert_eq!(http.body, encode_wav_pcm16(&audio(), 16_000));
+
+        // No language hint -> no language query param (Deepgram defaults).
+        let req = TranscriptionRequest::new(audio(), 16_000, "nova-3", "dg-key").unwrap();
+        let http = adapter.build_request(&req).unwrap();
+        assert_eq!(
+            http.url,
+            "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true"
+        );
+
+        // The multilingual code-switching mode passes through.
+        let req = TranscriptionRequest::new(audio(), 16_000, "nova-3", "dg-key")
+            .unwrap()
+            .with_language("multi");
+        let http = adapter.build_request(&req).unwrap();
+        assert!(http.url.ends_with("&language=multi"));
+    }
+
+    #[test]
+    fn deepgram_validates_language_allow_list() {
+        let adapter = DeepgramAdapter;
+        for lang in ["te", "en", "multi"] {
+            let req = TranscriptionRequest::new(audio(), 16_000, "nova-3", "k")
+                .unwrap()
+                .with_language(lang);
+            assert!(adapter.validate(&req).is_ok(), "language {lang}");
+        }
+        // Unknown codes and injection attempts are rejected.
+        for bad in ["fr", "TE", "", "te&model=nova-2", "en; rm -rf"] {
+            let req = TranscriptionRequest::new(audio(), 16_000, "nova-3", "k")
+                .unwrap()
+                .with_language(bad);
+            assert_eq!(
+                adapter.validate(&req).unwrap_err(),
+                ProviderError::InvalidLanguage(bad.to_string()),
+                "language {bad:?}"
+            );
+        }
+        assert!(ProviderError::InvalidLanguage("xx".into())
+            .to_string()
+            .contains("unsupported language"));
+    }
+
+    #[test]
+    fn deepgram_response_parsing_extracts_transcript() {
+        let body = br#"{"metadata":{"request_id":"r1"},"results":{"channels":[{"alternatives":[{"transcript":"hello world","confidence":0.99,"words":[]}]}]}}"#;
+        let resp = DeepgramAdapter.parse_response(body).unwrap();
+        assert_eq!(resp.text, "hello world");
+
+        // Escaped characters survive.
+        let body = br#"{"results":{"channels":[{"alternatives":[{"transcript":"say \"hi\"\nbye"}]}]}}"#;
+        let resp = DeepgramAdapter.parse_response(body).unwrap();
+        assert_eq!(resp.text, "say \"hi\"\nbye");
+
+        // A Whisper-style "text" field is NOT enough — Deepgram's key is
+        // "transcript", so this must fail loudly rather than misparse.
+        let err = DeepgramAdapter
+            .parse_response(br#"{"text":"wrong shape"}"#)
+            .unwrap_err();
+        assert!(matches!(err, ProviderError::ProviderMessage(_)));
+        assert!(err.to_string().contains("transcript"));
+    }
+
+    #[test]
+    fn deepgram_debug_redacts_token_header() {
+        let req = TranscriptionRequest::new(audio(), 16_000, "nova-3", "dg-secret")
+            .unwrap()
+            .with_language("en");
+        let http = DeepgramAdapter.build_request(&req).unwrap();
+        let debug = format!("{http:?}");
+        assert!(!debug.contains("dg-secret"), "key leaked: {debug}");
+        assert!(debug.contains("<redacted>"));
     }
 
     /// Compile-time-adjacent guard: this file must never contain a hardcoded
