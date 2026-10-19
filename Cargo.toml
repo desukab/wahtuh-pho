@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/wahtuh-audio",
+    "crates/wahtuh-transcribe",
+    "crates/wahtuh-normalize",
+    "crates/wahtuh-providers",
+    "crates/wahtuh-config",
+    "crates/wahtuh-core",
+]
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/desukab/wahtuh-pho"
+# NOTE: std-only. No external dependencies anywhere in this workspace, so the
+# build works fully offline and the binary stays lean for Android targets.
