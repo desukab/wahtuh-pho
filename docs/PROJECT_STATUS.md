@@ -2,7 +2,7 @@
 
 **Mission:** open-source, Rust-powered, offline-first voice dictation
 (Wispr Flow alternative). English, Telugu, and Telugu–English code-switching.
-**Target repo:** https://github.com/desukab/wahtuh-pho (published 2026-10-19) · **Last updated:** 2026-10-19 (IST, real engine + measured benchmarks)
+**Target repo:** https://github.com/desukab/wahtuh-pho (published 2026-10-19) · **Last updated:** 2026-10-20 (IST, Deepgram head-to-head measured)
 
 > Honesty rule: only measured numbers appear here. Anything not yet run is
 > marked **not run** — no accuracy, latency, or benchmark figures exist.
@@ -25,6 +25,7 @@
 | 2026-10-19 | Model weights downloaded + verified | Multilingual `ggml-tiny.bin` (74 MB), `ggml-base.bin` (141 MB), `ggml-small.bin` (465 MB) from Hugging Face `ggerganov/whisper.cpp`; SHA256 recorded; ggml magic verified. Stored at `~/workspace/models/` (never in git) |
 | 2026-10-19 | Evaluation corpus (licensed audio) | 31 clips, all 16 kHz mono: `jfk.wav` + 15 EN + 15 TE from Google FLEURS (**CC-BY-4.0**, cite arXiv:2206.12139). Common Voice was unreachable (Mozilla removed the files from Hugging Face in Oct 2025; Data Collective needs interactive sign-in). Manifest: `docs/eval_manifest.json` |
 | 2026-10-19 | Measured benchmarks (93 runs) | 3 models × 31 clips on whisper.cpp 1.8.3, 2-vCPU x86_64, no GPU. **EN mean WER: tiny 13.9% / base 11.8% / small 7.5%.** TE: all three models fail (117–128% mean WER). Scorer: jiwer 4.0.0. Full table in `docs/EVALUATION.md`; raw runs in `docs/bench_runs_{tiny,base,small}.jsonl` |
+| 2026-10-20 | Deepgram nova-3 head-to-head (61 runs, $0.0479) | Same 31 FLEURS clips via `nova-3` (`te`/`en`/`multi`). **EN 8.6% / TE 31.1% WER; `multi` fails Telugu (121.9%) — needs `language=te`.** Deepgram is the only tested engine that transcribes Telugu at all. Scorer: jiwer 4.0.0. Full table in `docs/EVALUATION.md` §7; raw runs in `docs/bench_runs_deepgram.jsonl`; runner in `tools/deepgram_bench.py` |
 
 ## License rationale
 
@@ -60,20 +61,20 @@ that should stay open whether it is built on by hobbyists or companies.
 | `wahtuh-audio` (PCM, chunker, bounded buffer) | Scaffolded + tested (12 unit tests) |
 | `wahtuh-transcribe` (`Engine` trait, `MockEngine`, **`WhisperCppEngine`**) | Real local engine via whisper-rs 0.16.0 (whisper.cpp v1.8.3 bundled); `$WAHTUH_MODEL_PATH` / `~/.cache/wahtuh/models/`; abort-callback cancellation; zero network in local path. 10 unit tests (3 whisper tests skip cleanly without a model). `LocalEngine` stub retained for its loud-failure contract |
 | `wahtuh-normalize` (cleanup, Telugu preservation, dictionary) | Scaffolded + tested (11 unit tests) |
-| `wahtuh-providers` (Groq/Gemini/OpenAI/Deepgram adapters) | Scaffolded + tested (20 unit tests). No HTTP transport (std-only); unreachable when `local_only`. Deepgram `nova-3` adapter added 2026-10-19 (`Authorization: Token` scheme, `te`/`en`/`multi` language allow-list) — **live benchmark blocked: stored API key rejected with 401, reconnect needed** |
+| `wahtuh-providers` (Groq/Gemini/OpenAI/Deepgram adapters) | Scaffolded + tested (20 unit tests). No HTTP transport (std-only); unreachable when `local_only`. Deepgram `nova-3` adapter added 2026-10-19 (`Authorization: Token` scheme, `te`/`en`/`multi` language allow-list) — **benchmarked live 2026-10-20** (61 runs, see Evaluation) |
 | `wahtuh-config` (config + local-only guarantee) | Scaffolded + tested (9 unit tests) |
 | `wahtuh-core` (session, history) | Scaffolded + tested (10 unit + 6 integration tests) |
 | `wahtuh-jni` Android bridge | Not started (design in `docs/ANDROID.md` only) |
 | Android app shell | Not started |
-| Evaluation / benchmarks | **Measured 2026-10-19:** 93 runs (3 models × 31 clips). EN WER tiny 13.9% / base 11.8% / small 7.5%; TE 117–128% WER (all models fail Telugu — see Blockers). `docs/EVALUATION.md` + raw `docs/bench_runs_{tiny,base,small}.jsonl`. **Deepgram head-to-head planned:** same 31 clips via `nova-3` (`te`/`en`/`multi`) — blocked on API key reconnect |
-| Deepgram connector (`custom.deepgram`) | Connector doc + `bin/deepgram_listen.py` helper authored 2026-10-19. Auth check failed: Deepgram returned 401 `INVALID_AUTH` — the stored key is invalid, not a placement bug (surrogate was attached correctly). Reconnect with a fresh key required before any live call |
+| Evaluation / benchmarks | **Measured 2026-10-19:** 93 runs (3 models × 31 clips). EN WER tiny 13.9% / base 11.8% / small 7.5%; TE 117–128% WER (all models fail Telugu — see Blockers). `docs/EVALUATION.md` + raw `docs/bench_runs_{tiny,base,small}.jsonl`. **Measured 2026-10-20:** Deepgram nova-3 head-to-head, 61 runs, $0.0479. EN 8.6% / TE 31.1% WER; `multi` fails Telugu (121.9%) — needs `language=te`. Deepgram is the only tested engine that transcribes Telugu. `docs/EVALUATION.md` §7 + raw `docs/bench_runs_deepgram.jsonl`; runner `tools/deepgram_bench.py` |
+| Deepgram connector (`custom.deepgram`) | Connector doc + `bin/deepgram_listen.py` helper authored 2026-10-19. **Known bug (2026-10-20): the surrogate auth path returns 401 on valid keys** — a key proven working via direct curl was rejected 5× through the connector. Root cause still open; the 2026-10-20 benchmark ran outside the connector with a one-time user-provided key (transient, never stored). Do not trust the connector for live calls until the surrogate path is fixed |
 | GitHub repo `desukab/wahtuh-pho` | **Published** 2026-10-19 (4 API commits). `.github/workflows/ci.yml` still missing — needs manual upload (App lacks `workflows` permission) |
 | Competitor teardown (user's licensed APK, static only) | **Done 2026-10-19:** `docs/ANDROID_UX_TEARDOWN.md` (screen inventory, onboarding state machine, bubble states, permission patterns), `docs/COMPETITOR_ARCHITECTURE.md` (gRPC streaming client, a11y+IME insertion engine, FGS/watchdog keepalive, SDK inventory), `docs/FEATURE_PARITY.md` corrected with app-grounded evidence. Raw decompiled output quarantined at `~/workspace/analysis/wisprflow/` (never in repo). |
 | UI direction | **Decided 2026-10-19:** retro 8-bit games vibe for UI/UX chrome and feedback; typeface Fredoka (Latin) + Baloo Tammudu 2 (Telugu companion) — NOT pixel fonts. Concept: `docs/UI_CONCEPT_8BIT.md` |
 
 ## Blockers
 
-1. **Telugu transcription is effectively unusable with whisper tiny/base/small** (measured 117–128% mean WER on the FLEURS Telugu subset; hypotheses are script gibberish/hallucinations). Do NOT ship or claim Telugu support on these models. Open: try `large` variants, sherpa-onnx/Vosk — or **Deepgram Nova-3** (`te`/`multi`), which is the fastest path to a Telugu answer. Deepgram benchmark is implemented and ready but **blocked: the stored API key was rejected (401 `INVALID_AUTH`) — user must reconnect with a fresh key**.
+1. **Telugu transcription is effectively unusable with whisper tiny/base/small** (measured 117–128% mean WER on the FLEURS Telugu subset; hypotheses are script gibberish/hallucinations). Do NOT ship or claim Telugu support on these models. **Answered 2026-10-20 for the cloud tier:** Deepgram Nova-3 with `language=te` measures 31.1% mean WER — the only tested engine that transcribes Telugu at all (see `docs/EVALUATION.md` §7). `language=multi` does NOT handle Telugu (121.9% WER). Open for the local tier: try `large` variants, sherpa-onnx/Vosk — or the Adalat AI Koyal pilot per `docs/STRATEGY.md`.
 2. **No ARM64 Android device** — the only latency/RSS numbers that matter for the ship decision cannot be measured yet.
 3. **No Android SDK/NDK** in this environment — required before the JNI bridge or any Android build.
 4. **Code-switching not evaluated** — no Telugu-English code-switch clips in the corpus; nothing was invented to fill the gap.
@@ -83,7 +84,7 @@ that should stay open whether it is built on by hobbyists or companies.
 ## Next steps (in order)
 
 1. Upload `.github/workflows/ci.yml` manually via the GitHub web UI (one file, content in local repo).
-2. **Deepgram:** user reconnects the API key (fresh key via the secure flow); then run the head-to-head benchmark (same 31 FLEURS clips, `nova-3` `te`/`en`/`multi`) and record WER/CER/latency/cost in `docs/EVALUATION.md`. This is the fastest open question: is Telugu solved by the cloud tier?
+2. **Done 2026-10-20:** Deepgram head-to-head benchmark ran (61 runs, $0.0479) and is recorded in `docs/EVALUATION.md` §7. Telugu is answered for the cloud tier (31.1% WER with `language=te`).
 3. Investigate Telugu locally: benchmark whisper `large` (or `large-v3-turbo` when available in ggml) and/or sherpa-onnx models on the Telugu subset before any Telugu claim.
 3. Install Android SDK/NDK; build the `wahtuh-jni` bridge; measure on an ARM64 device.
 4. Then: Android app shell, text-insertion spike, provider opt-in transport.

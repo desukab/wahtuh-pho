@@ -183,3 +183,56 @@ Multilingual ggml builds: `ggml-tiny.bin` (74.1 MiB), `ggml-base.bin`
 2. **Corpus growth** — code-switch clips, noisy-condition clips, and larger
    en/te sets per §2.2.
 3. **Repeated runs** — 3 repetitions per cell for mean ± range.
+
+## 7. Deepgram nova-3 (cloud) head-to-head — 2026-10-20 (measured)
+
+Same 31 FLEURS clips as §6, sent to Deepgram's pre-recorded API
+(`POST /v1/listen?model=nova-3&smart_format=true`) with four language
+settings: the 15 Telugu clips with `language=te`, the 15 English FLEURS
+clips + `jfk.wav` with `language=en`, and all 30 FLEURS clips again with
+`language=multi` (Deepgram's multilingual mode). 61/61 calls succeeded
+(exit 0, valid JSON). Scorer: jiwer 4.0.0 with the exact §6.2
+normalization. Latency is cloud round-trip from this VM (x86_64,
+Hyderabad, India), not on-device. Raw runs: `docs/bench_runs_deepgram.jsonl`.
+Total spend: **$0.0479** over ~606 s of audio (pre-recorded Nova-3:
+$0.0043/min mono, $0.0052/min multilingual).
+
+| Engine | Lang setting | Refs | Clips | Mean WER | Mean CER | p50 latency | p95 latency |
+|---|---|---|---|---|---|---|---|
+| Deepgram nova-3 | en | EN | 16 | 0.086 | 0.057 | 838 ms | 1,250 ms |
+| Deepgram nova-3 | multi | EN | 15 | 0.103 | 0.059 | 910 ms | 1,439 ms |
+| Deepgram nova-3 | te | TE | 15 | 0.311 | 0.133 | 1,933 ms | 4,606 ms |
+| Deepgram nova-3 | multi | TE | 15 | 1.219 | 1.016 | 1,066 ms | 1,477 ms |
+
+Head-to-head against the §6 local numbers:
+
+| Engine / model | EN WER | TE WER | EN p50 latency |
+|---|---|---|---|
+| whisper tiny (local) | 0.139 | 1.182 | 1,824 ms |
+| whisper base (local) | 0.118 | 1.275 | 3,675 ms |
+| whisper small (local) | 0.075 | 1.169 | 14,071 ms |
+| **Deepgram nova-3 (cloud)** | **0.086** | **0.311** | **838 ms** |
+
+Verdict (measured, nothing beyond the table):
+
+- **Deepgram is the only tested engine that transcribes Telugu at all.**
+  0.311 mean WER vs 1.17–1.28 (script gibberish / hallucinations) for
+  whisper tiny/base/small. The Telugu question is answered for the cloud
+  tier: viable; for the local tier it is still open (needs a large
+  variant or an alternative engine).
+- On English, Deepgram (0.086 WER) matches whisper-small (0.075 WER) at
+  ~17× lower p50 latency (838 ms vs 14,071 ms) — cloud round-trip, not
+  on-device.
+- **`language=multi` does NOT handle Telugu** (1.219 WER on Telugu refs —
+  same failure class as whisper). Telugu requires `language=te`.
+  Multilingual mode is fine on English refs (0.103 WER).
+
+Honest limits:
+
+- 0.311 WER is usable, not perfect — roughly 1 word in 3 wrong. Do not
+  market it as "100% accurate".
+- n = 15–16 per cell; FLEURS is clean read speech, not conversational
+  dictation audio. One run per cell (no repetitions).
+- Code-switching still unevaluated — `multi` was run on monolingual
+  clips only; there are no true code-switch clips in the corpus.
+- No ARM64 numbers — no device available.
