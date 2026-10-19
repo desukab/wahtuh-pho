@@ -67,6 +67,8 @@ that should stay open whether it is built on by hobbyists or companies.
 | Android app shell | Not started |
 | Evaluation / benchmarks | **Measured 2026-10-19:** 93 runs (3 models × 31 clips). EN WER tiny 13.9% / base 11.8% / small 7.5%; TE 117–128% WER (all models fail Telugu — see Blockers). `docs/EVALUATION.md` + raw `docs/bench_runs_{tiny,base,small}.jsonl` |
 | GitHub repo `desukab/wahtuh-pho` | **Published** 2026-10-19 (4 API commits). `.github/workflows/ci.yml` still missing — needs manual upload (App lacks `workflows` permission) |
+| Competitor teardown (user's licensed APK, static only) | **Done 2026-10-19:** `docs/ANDROID_UX_TEARDOWN.md` (screen inventory, onboarding state machine, bubble states, permission patterns), `docs/COMPETITOR_ARCHITECTURE.md` (gRPC streaming client, a11y+IME insertion engine, FGS/watchdog keepalive, SDK inventory), `docs/FEATURE_PARITY.md` corrected with app-grounded evidence. Raw decompiled output quarantined at `~/workspace/analysis/wisprflow/` (never in repo). |
+| UI direction | **Decided 2026-10-19:** retro 8-bit games vibe for UI/UX chrome and feedback; typeface Fredoka (Latin) + Baloo Tammudu 2 (Telugu companion) — NOT pixel fonts. Concept: `docs/UI_CONCEPT_8BIT.md` |
 
 ## Blockers
 
