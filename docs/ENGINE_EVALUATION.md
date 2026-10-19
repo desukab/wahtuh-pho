@@ -117,3 +117,52 @@ acceptable for push-to-talk dictation, but it must be validated, not assumed.
 
 If whisper base misses the quality bar on Telugu, revisit: sherpa-onnx with
 a custom Telugu ONNX model, or a larger whisper model for high-end devices.
+
+---
+
+## Integration record (2026-10-19): whisper-rs 0.16.0
+
+The deciding experiment's first step is done: whisper.cpp is now wired in
+for real in `wahtuh-transcribe::WhisperCppEngine` (replacing the
+`LocalEngine` stub as the production backend; `LocalEngine` remains as a
+loud-failure placeholder for API compatibility).
+
+- **Binding:** `whisper-rs` **0.16.0** (crates.io, verified via `cargo search`;
+  `whisper-rs-sys` 0.15.0). Safe two-crate design, no `unsafe` in our code.
+- **Bundled whisper.cpp:** **v1.8.3** per the vendored `CMakeLists.txt`
+  (`project("whisper.cpp" VERSION 1.8.3)`) inside `whisper-rs-sys-0.15.0`.
+  The vendored subtree ships no git SHA, so the upstream commit hash is not
+  recorded here — 1.8.3 is the version the build stamps into
+  `cargo:WHISPER_CPP_VERSION`.
+- **Why this binding, concretely:** the 0.16 API was verified against the
+  vendored source (`~/.cargo/registry/.../whisper-rs-0.16.0/src/`) rather
+  than from memory. It exposes everything the integration needs:
+  `WhisperContext::new_with_params`, `create_state()`,
+  `FullParams::new(SamplingStrategy::Greedy { best_of: 1 })`,
+  `set_n_threads` / `set_translate` / `set_language` /
+  `set_print_{special,progress,realtime,timestamps}`, `state.full`,
+  `full_n_segments`, and the `WhisperSegment::{start_timestamp,
+  end_timestamp, to_str_lossy}` accessors (timestamps in centiseconds → ×10
+  for our ms contract).
+- **`Send`:** satisfied with no `unsafe` on our side. `WhisperContext` is an
+  `Arc<WhisperInnerContext>` with upstream `unsafe impl Send + Sync`, and
+  `WhisperState` also carries upstream `Send + Sync` impls; each
+  `transcribe_chunk` builds its own state via `create_state()`, so no mutex
+  is needed. `impl Engine for WhisperCppEngine` requires `Engine: Send`, so
+  compilation itself is the proof.
+- **Cancellation:** yes — mid-inference abort is supported via
+  `FullParams::set_abort_callback_safe`, wired to our `CancellationToken`,
+  in addition to polling the token before/after `state.full`. An abort
+  surfaces as `EngineError::Cancelled`.
+- **Local-only:** the model loads from disk via
+  `WhisperContext::new_with_params`; zero network calls in the engine path.
+  Default resolution: `$WAHTUH_MODEL_PATH` → first `*.bin` in
+  `~/.cache/wahtuh/models/` → `~/.cache/wahtuh/models/ggml-base.bin`.
+- **Benchmark harness:** `crates/wahtuh-transcribe/examples/whisper_bench.rs`
+  (`whisper_bench <model.bin> <wav> [lang] [threads]`); strict 16-bit mono
+  16 kHz WAV parsing via `hound`; prints one JSON line with separate
+  `load_ms` / `latency_ms` and per-segment timestamps.
+- **Status:** no model was available in this environment (`~/.cache/wahtuh/`
+  empty), so the whisper tests skip cleanly; the jfk.wav end-to-end check
+  and real WER/latency numbers remain **not measured** — still the job of
+  the benchmark workstream once a model is downloaded.

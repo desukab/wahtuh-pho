@@ -1,10 +1,16 @@
-# Wahtuh Pho — Evaluation Plan
+# Wahtuh Pho — Evaluation Plan & First Measured Results
 
-**Date:** 2026-10-19 · **Status:** PLAN ONLY. No benchmarks have been run and
-no accuracy/latency numbers exist anywhere in this project. This document
-describes *what* will be measured, *how*, and *what is blocking it*. Any
-number appearing in a future results table must be traceable to a recorded
-run; until then, every results field reads **not measured**.
+**Date:** 2026-10-19 · **Status:** FIRST MEASURED RUN COMPLETE (x86_64 VM).
+§6 below holds real measured numbers from 93 transcription runs
+(3 models × 31 clips). Method (§1–§5) is unchanged in spirit; the corpus
+section now describes the data actually used.
+
+**Rule carried over from the plan:** any number in a results table must be
+traceable to a recorded run. Raw per-run output (hypothesis text, load_ms,
+latency_ms, peak RSS, exit codes) is in
+`docs/bench_runs_tiny.jsonl`, `docs/bench_runs_base.jsonl`, and
+`docs/bench_runs_small.jsonl` (one JSON object per line, split per model for
+size).
 
 ---
 
@@ -20,133 +26,160 @@ the product decision (engine choice, model size, ship/no-ship) is:
 3. **Resource footprint** on a phone: peak RSS during inference, model file
    size, load time.
 
-## 2. Corpus plan
+## 2. Corpus
 
-### 2.1 What audio is needed
+### 2.1 Corpus actually used (2026-10-19 run)
 
-| Subset | Source | License / consent |
-|---|---|---|
-| Telugu read speech | Mozilla Common Voice, Telugu validated subset | Corpus distributed under **CC0** (verify the license file in the downloaded release before use) |
-| English read speech (baseline) | Mozilla Common Voice, English validated subset | CC0, same verification |
-| Telugu–English code-switch | Self-recorded utterances (no public corpus covers our Tenglish style) | Written speaker consent per contributor; consent log kept with the corpus |
-| Noisy-condition samples | Self-recorded EN + TE in realistic noise (street, office) | Same consent log |
+Manifest: `docs/eval_manifest.json` — 31 entries, each `{id, file, lang,
+reference, license, source_url}`. All clips verified as 16-bit PCM mono
+16 kHz WAV (checked per file with Python `wave`: channels=1, sampwidth=2,
+framerate=16000).
 
-**Hard rule:** only consented recordings or appropriately licensed data. No
-scraped audio, no audio of non-consenting speakers, no PII in reference
-transcripts. If a clip's license is unclear, it is excluded.
+| Subset | Clips | Total audio | License / source |
+|---|---|---|---|
+| `jfk.wav` (en) | 1 | 11.0 s | whisper.cpp project sample (public-domain speech excerpt); https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/samples/jfk.wav |
+| `en_fleurs_1..15.wav` (en) | 15 | 158.2 s (4.8–16.8 s/clip) | **CC-BY-4.0** (Google FLEURS) |
+| `te_fleurs_1..15.wav` (te) | 15 | 150.3 s (4.8–14.4 s/clip) | **CC-BY-4.0** (Google FLEURS) |
 
-### 2.2 Corpus layout
+FLEURS citation (use wherever the corpus is described): Conneau et al.,
+"FLEURS: Few-shot Learning Evaluation of Universal Representations of
+Speech", arXiv:2206.12139. Source: https://huggingface.co/datasets/google/fleurs.
+
+Layout:
 
 ```
-eval/corpus/
-├── telugu/clean/        # *.wav (16 kHz mono) + refs/*.txt
-├── telugu/noisy/
-├── english/clean/
-├── english/noisy/
-└── codeswitch/clean/    # Tenglish utterances
-eval/
-├── CONSENT.md           # who recorded what, consent status (no PII)
-├── LICENSES.md          # license evidence per subset
-└── runs/                # one dir per benchmark run: params + raw outputs
+~/workspace/corpus/audio/        # 31 *.wav (16 kHz mono s16)
+~/workspace/wahtuh-pho/docs/eval_manifest.json       # ids, refs, licenses
+~/workspace/wahtuh-pho/docs/bench_runs_{tiny,base,small}.jsonl  # raw runs, per model
 ```
 
-- Audio normalized to **16 kHz mono WAV** before scoring (matches
-  `AudioConfig` / engine input contract).
-- Reference transcripts: one UTF-8 line per clip, verbatim (no
-  normalization), reviewed by a second listener for the code-switch subset.
+**Hard rule (kept):** only consented recordings or appropriately licensed
+data. No scraped audio, no audio of non-consenting speakers, no PII in
+reference transcripts.
 
-### 2.3 Corpus size targets (to be hit before claiming results)
+### 2.2 Not yet collected (targets, not claims)
 
-- ≥ 100 Telugu clips, ≥ 100 English clips, ≥ 50 code-switch clips,
-  ≥ 30 noisy clips per language. These are *targets*, not claims — the corpus
-  does not exist yet.
+- ≥ 100 Telugu clips, ≥ 100 English clips (currently 15 + 16 incl. jfk).
+- **Telugu–English code-switch clips: none exist — code-switching not
+  evaluated** (no code-switch clips in corpus; nothing was invented).
+- Noisy-condition samples: none yet.
 
 ## 3. Metrics
 
 ### 3.1 Accuracy
 
-- **WER (word error rate):** jiwer-style. Tokenize reference and hypothesis
-  into words (Unicode-aware split on whitespace; lowercase Latin only —
-  Telugu has no case), compute Levenshtein alignment, then
-  **WER = (S + D + I) / N** where S/D/I are substitutions, deletions,
-  insertions and N is the reference word count. Report per-subset and
-  macro-averaged.
-- **CER (character error rate):** same formula at character level; primary
-  metric for Telugu, where word boundaries are less stable than in English.
-- **Code-switch accuracy:** two numbers per mixed utterance —
-  (a) mixed-utterance WER as above, and
-  (b) **script-token recall:** Telugu-script tokens correct ÷ Telugu-script
-  tokens in the reference. A model that transliterates or drops Telugu words
-  fails (b) even if (a) looks passable.
+- **WER (word error rate):** jiwer 4.0.0 (`jiwer.wer`) on explicitly
+  normalized text (normalization documented in §6.2 — jiwer's own defaults do
+  no case folding or punctuation removal). WER = (S + D + I) / N; values
+  above 1.0 are possible and reported as-is.
+- **CER (character error rate):** `jiwer.cer` on the same normalized text;
+  primary metric for Telugu, where word boundaries are less stable.
+- **Code-switch accuracy:** not computed — no code-switch clips (§2.2).
 
 ### 3.2 Latency
 
-- **End-of-speech → `FinalResult`:** wall-clock ms from the last audio sample
-  to `DictationSession::finish` returning. Report **p50 / p95** over each
-  subset (minimum 30 clips per reported percentile).
-- **First-partial latency** (informational): time to first
-  `partial_transcript` output.
-- Decode parameters (threads, beam size, model variant) recorded per run;
-  changing them starts a new run.
+- `latency_ms` from the bench harness: inference only (model load reported
+  separately as `load_ms`). Report **p50 / p95** per (model, language);
+  percentiles by linear interpolation on sorted values
+  (rank = (n−1)·p/100). n = 15–16 clips per cell in this run — below the
+  30-clip target for stable percentiles; treat p95 as rough.
+- One run per (model, clip) in this run (no repetitions yet).
 
 ### 3.3 Footprint
 
-- **Peak RSS** during a session (desktop: `/usr/bin/time -v`; Android:
-  `dumpsys meminfo` or Android Studio profiler), model load included.
-- **Model file size** on disk and **load time** (`init()` wall-clock).
-- Engine working-set expectations from `docs/ENGINE_EVALUATION.md`
-  (whisper tiny ≈ 273 MB / base ≈ 388 MB per the whisper.cpp README table)
-  are *vendor figures*, not measurements — the plan is to replace them with
-  measured numbers.
+- **Peak RSS** per transcription process (method in §6.2), model load
+  included.
+- **Model file size** on disk and **load time** (`init()` wall-clock,
+  `load_ms`).
 
-## 4. Procedure
+## 4. Procedure (as actually run, 2026-10-19)
 
-1. Check out this repo at a tagged commit; record `cargo --version`, rustc
-   target, OS, CPU model, RAM.
-2. Resample corpus to 16 kHz mono; verify each clip decodes.
-3. Run the scorer (to be written: `eval/score` harness driving
-   `wahtuh-core` with the real engine behind the `Engine` trait — the same
-   `Chunker` 30 s / 5 s windows the product uses).
-4. Decode settings frozen for the run; 3 repetitions; report mean ± range.
-5. Results go in `eval/runs/<date>-<model>-<device>/RESULTS.md` with the exact
-   command lines. No number is quoted anywhere else without a pointer to its
-   run dir.
+1. Built once: `cargo build --release --example whisper_bench`
+   (cargo 1.99.1, rustc 1.99.1) in `crates/wahtuh-transcribe`.
+   Engine: whisper.cpp **1.8.3** via whisper-rs 0.16.0 / whisper-rs-sys
+   0.15.0 (version read from the vendored `whisper.cpp/CMakeLists.txt`:
+   `project("whisper.cpp" VERSION 1.8.3)`).
+2. For each model in {tiny, base, small} × each of the 31 manifest clips,
+   ran `whisper_bench <model.bin> <wav> <lang> 2` — lang `en`/`te` from the
+   manifest, 2 inference threads — capturing its single JSON stdout line
+   (`text`, `load_ms`, `latency_ms`, `segments`) and the process peak RSS.
+3. Scored all 93 hypotheses against manifest references with jiwer 4.0.0
+   under the §6.2 normalization; aggregated per (model, language).
 
 ## 5. Hardware matrix
 
 | Machine | Arch | Role | Status |
 |---|---|---|---|
-| This Linux VM (x86_64) | x86_64 | Initial bring-up, correctness, rough latency | Available |
-| ARM64 Android device | ARM64 (arm64-v8a) | Real target: on-device latency, RSS, thermal behavior | **Not available yet** — device TBD |
+| This Linux VM: **AMD EPYC 9D25, 2 vCPUs, 7.7 GB RAM, x86_64, no GPU** | x86_64 | Initial bring-up, correctness, rough latency | **Measured 2026-10-19** (§6) |
+| ARM64 Android device | ARM64 (arm64-v8a) | Real target: on-device latency, RSS, thermal behavior | **No ARM64 numbers — no device available** |
 
-Apple Silicon is not a target. Cross-compile checks for
-`aarch64-linux-android` happen once the NDK is installed (see
-`docs/ANDROID.md`).
+Apple Silicon is not a target.
 
-## 6. Benchmark status
+## 6. Benchmark results — 2026-10-19 (measured, x86_64 VM)
 
-**No benchmarks have been run.** Concretely:
+93/93 runs succeeded (exit 0, valid JSON). Threads: 2. One run per cell.
 
-- `wahtuh-transcribe::LocalEngine` is a **stub**: `init()` and
-  `transcribe_chunk()` return `EngineError::ModelNotBundled`. There is no
-  acoustic model in the repo and no inference code path to measure.
-- The `MockEngine` numbers would be meaningless (it hashes audio and returns
-  canned strings); no MockEngine-based "accuracy" is or will be reported.
-- `eval/` does not exist yet: no corpus, no scorer, no runs.
+| Model | Lang | Clips | Mean WER | Mean CER | p50 latency | p95 latency | Mean load | Peak RSS | Model file |
+|---|---|---|---|---|---|---|---|---|---|
+| tiny | en | 16 | 0.139 | 0.068 | 1,824 ms | 2,366 ms | 103 ms | 214 MiB | 77,691,713 B |
+| tiny | te | 15 | 1.182 | 1.045 | 7,516 ms | 10,921 ms | 129 ms | 214 MiB | 77,691,713 B |
+| base | en | 16 | 0.118 | 0.051 | 3,675 ms | 4,309 ms | 165 ms | 327 MiB | 147,951,465 B |
+| base | te | 15 | 1.275 | 1.000 | 8,557 ms | 16,385 ms | 271 ms | 327 MiB | 147,951,465 B |
+| small | en | 16 | 0.075 | 0.038 | 14,071 ms | 17,273 ms | 1,205 ms | 765 MiB | 487,601,967 B |
+| small | te | 15 | 1.169 | 1.024 | 33,076 ms | 41,001 ms | 1,159 ms | 765 MiB | 487,601,967 B |
 
-**Blocked on, in order:**
+Reading notes (no claims beyond the table):
 
-1. **Model weights download** — multilingual whisper `tiny`/`base` (`.bin`)
-   from HuggingFace; verify the upstream Whisper release license terms before
-   bundling (flagged in `docs/ENGINE_EVALUATION.md`).
-2. **whisper-rs integration** — link `whisper-rs` / `whisper-rs-sys` behind
-   the `Engine` trait in `LocalEngine` per the FFI plug-in contract in
-   `docs/ARCHITECTURE.md` §8 (the deciding experiment in
-   `docs/ENGINE_EVALUATION.md` §6 still needs its on-device data point).
-3. **ARM64 Android device** — for the only latency/RSS numbers that matter
+- Latency is inference only; load time is the separate `load_ms` column
+  (model `init()` wall-clock).
+- Telugu: all three models land at 117–128% mean WER / ~100–104% mean CER.
+  Raw hypotheses (in `docs/bench_runs_*.jsonl`) show why: Telugu-script
+  gibberish, mixed-script hallucinations (Latin/CJK fragments inside
+  Telugu-script output), and near-empty outputs (e.g. a single character).
+  English improves monotonically tiny → base → small, as expected.
+- **Code-switching not evaluated — no code-switch clips in corpus.**
+- **No ARM64 numbers — no device available.**
+
+### 6.1 Models
+
+Multilingual ggml builds: `ggml-tiny.bin` (74.1 MiB), `ggml-base.bin`
+(141.1 MiB), `ggml-small.bin` (465.1 MiB), in `~/workspace/models/`.
+
+### 6.2 Scoring & measurement methods (exact)
+
+- **jiwer 4.0.0** (`pip install jiwer`; version via
+  `importlib.metadata.version("jiwer")`). `jiwer.wer` / `jiwer.cer` called
+  with defaults. Verified on the installed build, jiwer 4.0.0's defaults
+  are: wer → `RemoveMultipleSpaces → Strip → ReduceToListOfListOfWords`
+  (split on space); cer → `Strip → ReduceToListOfListOfChars`. jiwer itself
+  does **no** lowercasing and **no** punctuation removal, so all
+  normalization below was applied by the scoring script first.
+- **Text normalization** (identical for reference and hypothesis):
+  1. `unicodedata.normalize("NFC", text)`
+  2. `.lower()` (Telugu has no case; affects Latin only)
+  3. delete every character whose Unicode category starts with "P"
+     (punctuation) or "S" (symbol); letters, **marks** (including Telugu
+     dependent vowel signs / virama, category M\*), numbers and whitespace
+     are kept
+  4. collapse whitespace runs to one space, strip ends.
+  (An earlier draft used regex `[^\\w\\s]`, which wrongly deleted M\*
+  marks and mangled Telugu; it was replaced before any reported number
+  was produced.)
+- **Peak RSS:** `/usr/bin/time` is not installed on this VM, so the
+  per-process peak was measured with `os.wait4()` on the bench child:
+  `rusage.ru_maxrss` (kilobytes on Linux) — the same kernel-tracked
+  maximum-RSS figure `/usr/bin/time -v` reports. Reported per
+  (model, language) as the max over that cell's runs (min–max spread was
+  <1% within each model). Method validated against a child allocating a
+  known 200 MiB (reported 214,904 KiB ≈ 210 MiB including interpreter).
+- **Percentiles:** linear interpolation on sorted per-clip latencies
+  (rank = (n−1)·p/100, numpy-`linear` style).
+- No repetitions: each (model, clip) ran once.
+
+### 6.3 What remains blocked
+
+1. **ARM64 Android device** — for the only latency/RSS numbers that matter
    for the ship decision.
-4. **Corpus collection** — Common Voice Telugu/English subsets + consented
-   self-recorded code-switch and noisy samples per §2.
-
-When unblocked, the first run fills in §6 with a pointer to
-`eval/runs/.../RESULTS.md` — and not before.
+2. **Corpus growth** — code-switch clips, noisy-condition clips, and larger
+   en/te sets per §2.2.
+3. **Repeated runs** — 3 repetitions per cell for mean ± range.
