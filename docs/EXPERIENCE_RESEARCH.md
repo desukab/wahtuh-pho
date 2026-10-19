@@ -1,6 +1,6 @@
 # Wahtuh Pho — Experience Research: making dictation feel great
 
-**Date:** 2026-10-20 · **Status:** local research document for product review. **DO NOT PUSH to GitHub without explicit approval.**
+**Date:** 2026-10-20 · **Status:** research document for product review. Pushed to GitHub 2026-10-20 per standing approval.
 
 **Product principle (non-negotiable):** the customer never needs to know about the backend. Every technical complexity must have an invisible UX answer. A user should never encounter the words *model, engine, endpoint, quota (as a technical term), API,* or *latency*.
 
