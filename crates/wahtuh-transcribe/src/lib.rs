@@ -367,6 +367,296 @@ impl Engine for LocalEngine {
     }
 }
 
+// ---------------------------------------------------------------------------
+// WhisperCppEngine: real on-device transcription via whisper.cpp (whisper-rs)
+// ---------------------------------------------------------------------------
+
+use std::path::{Path, PathBuf};
+
+/// Environment variable overriding the model path used by
+/// [`WhisperCppEngine::from_env_or_default`].
+pub const WHISPER_MODEL_PATH_ENV: &str = "WAHTUH_MODEL_PATH";
+
+/// Subdirectory of `$HOME` searched for `*.bin` model files.
+const MODEL_CACHE_SUBDIR: &str = ".cache/wahtuh/models";
+
+/// Filename used as the last-resort default model path.
+const DEFAULT_MODEL_FILENAME: &str = "ggml-base.bin";
+
+/// Unicode block for the Telugu script, used for auto language detection.
+const TELUGU_RANGE: std::ops::RangeInclusive<char> = '\u{0C00}'..='\u{0C7F}';
+
+/// Real on-device transcription backed by whisper.cpp through the
+/// [`whisper_rs`](https://docs.rs/whisper-rs) safe bindings (v0.16).
+///
+/// This is the production implementation of the [`Engine`] trait: model and
+/// inference both run locally, there are no stubs, and every failure mode
+/// maps to an [`EngineError`].
+///
+/// # Model resolution
+///
+/// [`WhisperCppEngine::from_env_or_default`] picks the model file in this
+/// order:
+/// 1. the `$WAHTUH_MODEL_PATH` environment variable, when set;
+/// 2. the first `*.bin` file (lexicographic order) in `~/.cache/wahtuh/models/`;
+/// 3. `~/.cache/wahtuh/models/ggml-base.bin` as a last-resort default path.
+///    If nothing exists there, [`Engine::init`] fails with an actionable
+///    [`EngineError::ModelNotBundled`] message naming the path and where to
+///    get a model.
+///
+/// # Local-only guarantee
+///
+/// The model is loaded from disk with `WhisperContext::new_with_params` and
+/// inference is pure local compute. This engine's code path performs **zero
+/// network calls** — audio and model bytes never leave the machine.
+///
+/// # Threading and `Send`
+///
+/// `whisper_rs::WhisperContext` is `Send + Sync` upstream: it is a thin
+/// `Arc` wrapper around `WhisperInnerContext`, which carries explicit
+/// `unsafe impl Send` / `unsafe impl Sync`. Each `transcribe_chunk` call
+/// builds its own `WhisperState` (also `Send + Sync` upstream) via
+/// `create_state()`, so no locking is needed and `Engine: Send` holds by
+/// construction — the `impl Engine for WhisperCppEngine` below would not
+/// compile otherwise.
+///
+/// # Cancellation
+///
+/// The [`CancellationToken`] is polled before and after inference, and is
+/// additionally wired into whisper.cpp's abort callback
+/// (`FullParams::set_abort_callback_safe`), so a long chunk aborts promptly
+/// *mid-inference* and surfaces as [`EngineError::Cancelled`] rather than
+/// running to completion.
+pub struct WhisperCppEngine {
+    model_path: PathBuf,
+    language: Option<String>,
+    n_threads: usize,
+    ctx: Option<whisper_rs::WhisperContext>,
+}
+
+impl WhisperCppEngine {
+    /// Build an engine for the model at `path`, with automatic language
+    /// detection (Telugu script sniffing, see [`LanguageHint`]).
+    pub fn with_model(path: impl Into<PathBuf>) -> Self {
+        Self::with_model_and_language(path, None)
+    }
+
+    /// Build an engine for the model at `path`, forcing whisper's language
+    /// (e.g. `Some("en")`, `Some("te")`). `None` means auto-detect.
+    pub fn with_model_and_language(path: impl Into<PathBuf>, language: Option<String>) -> Self {
+        Self {
+            model_path: path.into(),
+            language,
+            n_threads: default_threads(),
+            ctx: None,
+        }
+    }
+
+    /// Resolve the model path from the environment / model cache and build
+    /// an engine for it. See the [struct-level docs](WhisperCppEngine#model-resolution)
+    /// for the exact resolution order.
+    pub fn from_env_or_default() -> Self {
+        let path = std::env::var(WHISPER_MODEL_PATH_ENV)
+            .ok()
+            .map(PathBuf::from)
+            .or_else(first_cached_model)
+            .unwrap_or_else(|| model_cache_dir().join(DEFAULT_MODEL_FILENAME));
+        Self::with_model(path)
+    }
+
+    /// Override the inference thread count (default: logical CPU count).
+    /// Must be called before [`Engine::init`] has no effect on thread use —
+    /// it is read fresh on every `transcribe_chunk` call.
+    pub fn set_threads(&mut self, n_threads: usize) {
+        self.n_threads = n_threads.max(1);
+    }
+
+    /// Builder-style thread-count override.
+    pub fn with_threads(mut self, n_threads: usize) -> Self {
+        self.set_threads(n_threads);
+        self
+    }
+
+    /// The model file this engine will load on [`Engine::init`].
+    pub fn model_path(&self) -> &Path {
+        &self.model_path
+    }
+
+    /// The forced language, if any (`None` = auto-detect).
+    pub fn language(&self) -> Option<&str> {
+        self.language.as_deref()
+    }
+
+    /// Map transcript text to a [`LanguageHint`]: the configured language
+    /// wins when set, otherwise Telugu script (U+0C00–U+0C7F) is sniffed —
+    /// mixed Telugu/Latin text reports [`LanguageHint::CodeSwitch`].
+    fn detect_language(&self, text: &str) -> LanguageHint {
+        if let Some(lang) = self.language.as_deref() {
+            return match lang {
+                "en" => LanguageHint::English,
+                "te" => LanguageHint::Telugu,
+                _ => LanguageHint::Unknown,
+            };
+        }
+        let has_telugu = text.chars().any(|c| TELUGU_RANGE.contains(&c));
+        let has_latin = text.chars().any(|c| c.is_ascii_alphabetic());
+        match (has_telugu, has_latin) {
+            (true, true) => LanguageHint::CodeSwitch,
+            (true, false) => LanguageHint::Telugu,
+            (false, true) => LanguageHint::English,
+            (false, false) => LanguageHint::Unknown,
+        }
+    }
+}
+
+impl Engine for WhisperCppEngine {
+    fn name(&self) -> &'static str {
+        "whisper-cpp"
+    }
+
+    fn init(&mut self) -> Result<(), EngineError> {
+        if self.ctx.is_some() {
+            return Ok(()); // idempotent
+        }
+        if !self.model_path.is_file() {
+            return Err(EngineError::ModelNotBundled(format!(
+                "whisper model not found at '{}'. Download a multilingual ggml model \
+                 (e.g. ggml-base.bin from https://huggingface.co/ggerganov/whisper.cpp) \
+                 into ~/.cache/wahtuh/models/, or set ${} to the model path.",
+                self.model_path.display(),
+                WHISPER_MODEL_PATH_ENV
+            )));
+        }
+        // CPU-only context params (no GPU features enabled); loads from disk only.
+        let ctx_params = whisper_rs::WhisperContextParameters::new();
+        let ctx =
+            whisper_rs::WhisperContext::new_with_params(&self.model_path, ctx_params).map_err(
+                |e| {
+                    EngineError::InferenceFailed(format!(
+                        "failed to load whisper model '{}': {e}",
+                        self.model_path.display()
+                    ))
+                },
+            )?;
+        self.ctx = Some(ctx);
+        Ok(())
+    }
+
+    fn is_initialized(&self) -> bool {
+        self.ctx.is_some()
+    }
+
+    fn transcribe_chunk(
+        &self,
+        samples: &[i16],
+        cancel: &CancellationToken,
+    ) -> Result<Transcript, EngineError> {
+        let ctx = self.ctx.as_ref().ok_or(EngineError::NotInitialized)?;
+        if samples.is_empty() {
+            return Err(EngineError::InvalidAudio("empty chunk".to_string()));
+        }
+        if cancel.is_cancelled() {
+            return Err(EngineError::Cancelled);
+        }
+
+        // i16 PCM -> f32 in [-1.0, 1.0], as whisper.cpp expects.
+        let pcm: Vec<f32> = samples.iter().map(|s| *s as f32 / 32768.0).collect();
+
+        let mut state = ctx.create_state().map_err(|e| {
+            EngineError::InferenceFailed(format!("whisper failed to create state: {e}"))
+        })?;
+
+        let mut params = whisper_rs::FullParams::new(whisper_rs::SamplingStrategy::Greedy {
+            best_of: 1,
+        });
+        params.set_n_threads(self.n_threads as i32);
+        params.set_translate(false);
+        params.set_language(self.language.as_deref());
+        params.set_print_special(false);
+        params.set_print_progress(false);
+        params.set_print_realtime(false);
+        params.set_print_timestamps(false);
+        // Abort mid-inference when the token fires: whisper.cpp polls this
+        // callback during encode/decode.
+        let abort_token = cancel.clone();
+        params.set_abort_callback_safe(move || abort_token.is_cancelled());
+
+        state.full(params, &pcm).map_err(|e| {
+            if cancel.is_cancelled() {
+                EngineError::Cancelled
+            } else {
+                EngineError::InferenceFailed(format!("whisper inference failed: {e}"))
+            }
+        })?;
+        if cancel.is_cancelled() {
+            return Err(EngineError::Cancelled);
+        }
+
+        // whisper.cpp reports segment times in centiseconds; the Engine
+        // contract uses milliseconds.
+        let n = state.full_n_segments();
+        let mut segments = Vec::new();
+        let mut text_parts = Vec::new();
+        for i in 0..n {
+            if cancel.is_cancelled() {
+                return Err(EngineError::Cancelled);
+            }
+            let Some(seg) = state.get_segment(i) else {
+                continue;
+            };
+            let text = seg
+                .to_str_lossy()
+                .map(|s| s.into_owned())
+                .unwrap_or_default();
+            let text = text.trim().to_string();
+            if text.is_empty() {
+                continue;
+            }
+            segments.push(Segment {
+                start_ms: seg.start_timestamp().max(0) as u64 * 10,
+                end_ms: seg.end_timestamp().max(0) as u64 * 10,
+                text: text.clone(),
+            });
+            text_parts.push(text);
+        }
+
+        let text = text_parts.join(" ");
+        let language_hint = self.detect_language(&text);
+        Ok(Transcript {
+            text,
+            segments,
+            language_hint,
+        })
+    }
+}
+
+/// Logical CPU count, falling back to 4, always at least 1.
+fn default_threads() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .max(1)
+}
+
+/// `$HOME/.cache/wahtuh/models` (`"."`-relative fallback when `$HOME` is unset).
+fn model_cache_dir() -> PathBuf {
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join(MODEL_CACHE_SUBDIR)
+}
+
+/// First `*.bin` in the model cache, lexicographic order for determinism.
+fn first_cached_model() -> Option<PathBuf> {
+    let entries = std::fs::read_dir(model_cache_dir()).ok()?;
+    let mut bins: Vec<PathBuf> = entries
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("bin"))
+        .collect();
+    bins.sort();
+    bins.into_iter().next()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468,5 +758,123 @@ mod tests {
         let t2 = t.clone();
         t.cancel();
         assert!(t2.is_cancelled());
+    }
+
+    // --- WhisperCppEngine tests -------------------------------------------
+
+    /// Resolve a model the same way `WhisperCppEngine::from_env_or_default`
+    /// does; `None` when no model file exists on this machine.
+    fn available_whisper_model() -> Option<PathBuf> {
+        let e = WhisperCppEngine::from_env_or_default();
+        e.model_path().is_file().then(|| e.model_path().to_path_buf())
+    }
+
+    #[test]
+    fn whisper_engine_fails_loudly_without_model_file() {
+        let mut e = WhisperCppEngine::with_model("/nonexistent/wahtuh-test-model.bin");
+        assert_eq!(e.name(), "whisper-cpp");
+        assert!(!e.is_initialized());
+        assert_eq!(e.language(), None);
+
+        let err = e.init().unwrap_err();
+        assert!(
+            matches!(err, EngineError::ModelNotBundled(_)),
+            "expected ModelNotBundled, got {err:?}"
+        );
+        let msg = err.to_string();
+        assert!(msg.contains("/nonexistent/wahtuh-test-model.bin"), "msg: {msg}");
+        assert!(msg.contains("WAHTUH_MODEL_PATH"), "msg: {msg}");
+        assert!(!e.is_initialized(), "failed init must not mark initialized");
+
+        // Uninitialized engine reports NotInitialized regardless of input.
+        let cancel = CancellationToken::new();
+        assert_eq!(
+            e.transcribe_chunk(&samples(1, 100), &cancel),
+            Err(EngineError::NotInitialized)
+        );
+        // ... and a cancelled token does not change that ordering.
+        cancel.cancel();
+        assert_eq!(
+            e.transcribe_chunk(&samples(1, 100), &cancel),
+            Err(EngineError::NotInitialized)
+        );
+    }
+
+    #[test]
+    fn whisper_model_resolution_prefers_env_var() {
+        // Point the env var at a nonexistent path: resolution must still pick
+        // it (init then fails loudly naming that path).
+        std::env::set_var("WAHTUH_MODEL_PATH", "/tmp/wahtuh-env-override-test.bin");
+        let e = WhisperCppEngine::from_env_or_default();
+        assert_eq!(e.model_path(), Path::new("/tmp/wahtuh-env-override-test.bin"));
+        std::env::remove_var("WAHTUH_MODEL_PATH");
+    }
+
+    #[test]
+    fn whisper_engine_skips_without_model() {
+        let Some(model) = available_whisper_model() else {
+            eprintln!("SKIP: no whisper model found");
+            return;
+        };
+        eprintln!("using whisper model: {}", model.display());
+
+        let mut e = WhisperCppEngine::with_model(&model);
+        e.init().expect("init() must succeed when the model file exists");
+        assert!(e.is_initialized());
+        e.init().expect("init() must be idempotent");
+
+        // A cancelled token aborts before any inference runs.
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        assert_eq!(
+            e.transcribe_chunk(&samples(1, 100), &cancel),
+            Err(EngineError::Cancelled)
+        );
+        cancel.reset();
+
+        // Empty input is rejected without touching the backend.
+        assert!(matches!(
+            e.transcribe_chunk(&[], &cancel),
+            Err(EngineError::InvalidAudio(_))
+        ));
+
+        // Optional end-to-end check against the licensed jfk.wav corpus clip.
+        let wav = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/audio/jfk.wav");
+        if !wav.is_file() {
+            eprintln!("SKIP: corpus wav not found at {}", wav.display());
+            return;
+        }
+        let samples = match read_wav_i16_mono_16k(&wav) {
+            Ok(s) => s,
+            Err(why) => {
+                eprintln!("SKIP: cannot parse {}: {why}", wav.display());
+                return;
+            }
+        };
+        let t = e
+            .transcribe_chunk(&samples, &cancel)
+            .expect("transcription of jfk.wav must succeed");
+        assert!(
+            !t.text.trim().is_empty(),
+            "jfk.wav transcript must be non-empty"
+        );
+        eprintln!("whisper transcript: {:?}", t.text.trim());
+        // Segment timestamps must be centiseconds*10 and well-ordered.
+        for s in &t.segments {
+            assert!(s.end_ms >= s.start_ms, "segment not ordered: {s:?}");
+        }
+    }
+
+    /// Read 16-bit mono 16 kHz PCM from a WAV file; anything else is an error.
+    fn read_wav_i16_mono_16k(path: &Path) -> Result<Vec<i16>, String> {
+        let mut reader = hound::WavReader::open(path).map_err(|e| e.to_string())?;
+        let spec = reader.spec();
+        if spec.channels != 1 || spec.sample_rate != 16_000 || spec.bits_per_sample != 16 {
+            return Err(format!("expected 16-bit mono 16kHz PCM, got {spec:?}"));
+        }
+        reader
+            .samples::<i16>()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
     }
 }

@@ -7,3 +7,11 @@ description = "Transcription engine abstraction for Wahtuh Pho: Engine trait, Tr
 
 [lib]
 name = "wahtuh_transcribe"
+
+[dependencies]
+whisper-rs = "0.16"
+hound = "1"
+serde_json = "1"
+
+[dev-dependencies]
+# (none; tests use only the engine APIs)
