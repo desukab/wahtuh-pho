@@ -236,3 +236,44 @@ Honest limits:
 - Code-switching still unevaluated — `multi` was run on monolingual
   clips only; there are no true code-switch clips in the corpus.
 - No ARM64 numbers — no device available.
+
+## 8. German offline benchmark — 2026-10-20 (measured)
+
+Premium-market quality gate (user, 2026-10-20): offline must be genuinely
+good in German at shippable model sizes (~75–150 MB), not just as a
+500 MB download. Same harness as §6: 15 German FLEURS clips
+(`de_fleurs_1..15.wav`, 223.5 s total, verified 16 kHz mono s16, CC-BY-4.0),
+whisper.cpp 1.8.3 CLI, jiwer 4.0.0 with the exact §6.2 normalization,
+peak RSS via `os.wait4`, one run per cell, x86_64 VM (2 vCPU, no GPU).
+Raw runs: `docs/bench_runs_de.jsonl`; manifest: `docs/eval_manifest_de.json`.
+Audio: `~/workspace/corpus/audio/de_fleurs_*.wav` (never in git).
+
+| Model | Size | de WER | de CER | p50 latency | p95 latency | Peak RSS |
+|---|---|---|---|---|---|---|
+| tiny | 77.7 MB | 0.316 | 0.088 | 1,926 ms | 3,710 ms | 243 MiB |
+| base | 148.0 MB | 0.218 | 0.065 | 4,114 ms | 22,988 ms¹ | 357 MiB |
+| small | 487.6 MB | 0.088 | 0.024 | 12,810 ms | 21,209 ms | 790 MiB |
+
+¹ base p95 is inflated by whisper.cpp's temperature-fallback retries on
+5 clips (13–19 s each, still accurate transcripts); median behavior is 4.1 s.
+
+Verdict (measured, nothing beyond the table):
+
+- **Only small is "really good" for German (8.8% WER)** — but at
+  487.6 MB / 790 MiB RSS it is 3× over the shippable-size gate.
+- At shippable sizes, base (21.8% WER — ~1 word in 5 wrong) is the best
+  available and tiny (31.6% — ~1 in 3 wrong) is not shippable quality.
+  German is notably harder for these models than English was on the same
+  harness (tiny/en: 13.9% WER).
+- CER is kinder than WER here (German compounds inflate word errors),
+  but the WER gap vs the quality bar is real.
+
+Strategic implication: the offline German quality bar cannot be met at
+75–150 MB with stock whisper multilingual models. Options: (a) ship
+base-tier German offline as "experimental", (b) route German to the cloud
+tier at launch (like Telugu), or (c) evaluate a German-specialized small
+model (distilled/fine-tuned, 100–150 MB) — none tested yet.
+
+Honest limits: n = 15 per cell; x86_64 VM numbers (expect 2–5× slower on
+phones); read-speech FLEURS only, no noisy or accent-diverse German; one
+run per cell.
