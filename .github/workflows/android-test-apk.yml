@@ -1,0 +1,65 @@
+name: Android test APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - ".github/workflows/android-test-apk.yml"
+      - "docs/TELUGU_FIRST_ASR_PLAN.md"
+      - "tools/score_asr.py"
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and build tools
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
+          echo "ANDROID_JAR=$ANDROID_HOME/platforms/android-35/android.jar" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned Android dependencies
+        run: ./scripts/fetch-deps.sh
+
+      - name: Fetch checksummed offline ASR models
+        run: ./scripts/fetch-models.sh
+
+      - name: Run Android text pipeline tests
+        run: ./scripts/test.sh
+
+      - name: Build and verify ARM64 APK
+        run: |
+          ./scripts/build.sh
+          APK="build/wahtuh-pho-0.1.0.apk"
+          test -s "$APK"
+          apksigner verify --verbose "$APK"
+          zipalign -c -v 4 "$APK"
+          sha256sum "$APK" | tee build/apk.sha256
+
+      - name: Upload installable test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wahtuh-pho-android-arm64-debug
+          path: |
+            build/wahtuh-pho-0.1.0.apk
+            build/apk.sha256
+          if-no-files-found: error
+          retention-days: 14
