@@ -163,6 +163,6 @@ Requests include audio, model, language hint, and short vocabulary hints from yo
 - **Field Context** is a separate, off-by-default switch. When enabled, the app reads the focused field at stop time and sends only extracted names/code terms to AI polish. It is blocked unless AI polish is on, and refuses passwords and Wahtuh Pho's own fields.
 - **History retention** is KEEP, 24 HOURS, or NEVER. NEVER deletes `history.jsonl` and legacy audio and stops saving new entries.
 - **Clear transcript history** deletes `history.jsonl` and any legacy audio files.
-- Recordings are not saved by default; clearing app storage or uninstalling removes all local data.
+- Recordings are never saved; clearing app storage or uninstalling removes all local data.
 - Remove the cloud key at any time; transcripts remain.
 - No analytics, ads, crash reporting, or telemetry SDKs. `INTERNET` exists only for opt-in cloud calls.

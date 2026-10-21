@@ -6,7 +6,11 @@ Wahtuh Pho is an independent, local-first voice keyboard and floating dictation 
 
 > Not affiliated with Wispr Flow. The interaction model is inspired by modern dictation apps; all app code, copy, and artwork here are original, including the arcade-inspired UI and 8-bit launcher icon.
 
-![Home screen](docs/screenshots/home.png)
+| Home | Settings | Offline arcade |
+|:---:|:---:|:---:|
+| ![Home screen](docs/screenshots/home.png) | ![Settings](docs/screenshots/settings.png) | ![Offline arcade](docs/screenshots/arcade.png) |
+
+More screens: [Dictionary](docs/screenshots/words.png) · [Snippets](docs/screenshots/snips.png) · [Styles](docs/screenshots/style.png)
 
 ## Why another dictation app?
 
@@ -26,7 +30,7 @@ Wispr Flow's paid promise, our clean-room notes, and the feature gaps we deliber
 
 ## Status
 
-- **Android app: v0.3.0.** Whistle local ASR, seven languages, verified insertion, snippets, writing styles, self-corrections, developer dictation, inline edit commands, selected-text Command Mode, local history retention, boot recovery, and optional cloud providers. Builds as an 18 MB APK. Text tests pass **51/51** and VAD checks **11/11**. The newest features still need a physical device pass; see [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md) for the honest Wispr Flow comparison.
+- **Android app: v0.3.0.** Whistle local ASR, seven languages, verified insertion, snippets, writing styles, self-corrections, developer dictation, inline edit commands, selected-text Command Mode, local history retention, boot recovery, and optional cloud providers. Builds as an 18 MB APK. Text tests pass **51/51** and VAD checks **11/11**. The UI, drawer, tabs, bubble visibility, and all three arcade games were exercised on a vivo V2251; voice, command, and cloud paths still need broader field testing. See [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md) for the honest Wispr Flow comparison.
 - **Rust core: scaffold + real local Whisper engine.** 74 workspace tests pass; the shipped APK has its own JNI bridge to Whistle and does **not** link the Rust crates.
 - The Android app is Gradle-free and built with `aapt2`, `javac`, D8, and `apksigner`.
 
@@ -41,7 +45,7 @@ Wispr Flow's paid promise, our clean-room notes, and the feature gaps we deliber
 - **Self-corrections and developer dictation** — "meet at five, actually six", "send it to John, I mean Jane", and "scratch that" resolve locally. Spoken `camel case`, `snake_case`, `PascalCase`, `kebab-case`, `dot.case`, and file tags become identifiers without a cloud call. Numbered lists are recognized from "first… second… third…".
 - **Inline edit commands** — "delete the last sentence", "delete the last word", "make that a bullet list", "make that a numbered list", "make that uppercase", "make that lowercase", and "capitalize that" work locally with no cloud key.
 - **Command Mode** — select text in any app, hold the bubble, and speak an edit. On-device it handles case changes, bullet/numbered lists, and deletes. A Groq, OpenAI, or Gemini key adds freeform rewrites such as "make this shorter". Only the selection changes, and the notification can undo it.
-- **Local history controls** — KEEP, 24 HOURS, or NEVER. Choosing NEVER purges saved transcripts and any saved audio, and the 24-hour policy deletes old entries and old audio automatically.
+- **Local history controls** — KEEP, 24 HOURS, or NEVER. Choosing NEVER purges saved transcripts and any legacy audio, and the 24-hour policy deletes old entries and legacy audio automatically. New dictation audio is never written to disk.
 - **Bubble controls** — small, normal, or large, with 60%, 80%, or 100% opacity.
 - **Boot and battery resilience** — if the bubble was running, a boot receiver restores it after reboot, and Settings links to the battery-optimization exemption.
 - **Writing styles + app-aware tone** — default, formal, casual, very casual, and excited. With Default selected, chat packages get casual punctuation and email packages stay formal using the foreground package name only; no screen contents are read. Styles also feed optional AI cleanup.
@@ -123,7 +127,7 @@ and [Wispr Flow research](docs/WISPR_FLOW_RESEARCH.md).
 - Cloud providers are only used when you explicitly select one and turn local-only off.
 - Cloud audio is sent as a standard multipart/JSON transcription request. Optional cleanup sends final text only; when transcription is Deepgram, the app can reuse your configured Groq, OpenAI, or Gemini key for that separate polish request. If **Field Context** is enabled, AI polish also receives a short list of extracted names/code terms, never the surrounding prose.
 - API keys are encrypted with an Android Keystore AES/GCM key and never logged.
-- History and optional recordings live in app-private storage. Clear history from Settings; recordings are not deleted by that action.
+- Transcripts live in app-private storage. New audio is not saved; legacy audio is purged by Clear, NEVER, and the 24-hour policy. Clear history from Settings.
 
 Full details: [docs/PRIVACY.md](docs/PRIVACY.md) and [docs/ANDROID_APP.md](docs/ANDROID_APP.md).
 

@@ -71,5 +71,4 @@ export ANDROID_JAR=$HOME/asdk/android-35/android.jar
 - `files/models/` — unpacked Whistle model and version marker
 - `files/history.jsonl` — JSONL, max 300 entries, subject to KEEP / 24 HOURS / NEVER
 - `files/audio/` — legacy only; no new recordings are written and retention deletes leftovers
-- `files/audio/` — optional per-dictation WAVs
 - `shared_prefs/` — settings; API key ciphertext only, with the key in Keystore

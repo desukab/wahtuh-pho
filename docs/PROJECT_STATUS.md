@@ -3,7 +3,7 @@
 **Mission:** open-source, offline-first voice dictation for Android, with an arcade-inspired UI.
 **Repo:** https://github.com/desukab/wahtuh-pho · **Updated:** 2026-10-22
 
-> Honesty rule: only measured or directly observed results appear here. The v0.3.0 APK compiles and passes local tests. Bubble recording, timer/waveform, insertion, and all three arcade games were exercised on the vivo V2251. The newest features in this build still need a fresh device pass: Command Mode, inline edit commands, retention controls, boot recovery, Field Context, and selected-text replacement.
+> Honesty rule: only measured or directly observed results appear here. The v0.3.0 APK compiles, passes local tests, installs over the previous build, and its Home, tabs, Settings, drawer, bubble visibility, and all three arcade games were exercised on the vivo V2251. The refreshed screenshots in `docs/screenshots/` were captured from build `e274e26b…` on that device. Voice, Command Mode, retention, boot recovery, Field Context, and selected-text replacement still need a broader field pass.
 
 ## Android app — v0.3.0
 
@@ -15,7 +15,7 @@
 - Text: punctuation, filler removal, dictionary, snippets, five styles, email dictation, optional text-only cloud cleanup.
 - Precision helpers: local self-corrections (`actually`, `no wait`, `I mean`, `scratch that`), spoken developer identifiers (`camelCase`, `snake_case`, `PascalCase`, `kebab-case`, `dot.case`), file tags (`@main.py`), numbered lists, and local inline edits (delete last sentence/word, bullet/numbered lists, case changes). Tests: **51/51** text, **11/11** VAD.
 - Command Mode: select text, hold the bubble, and speak an edit. On-device handles case, list, and delete commands; Groq, OpenAI, or Gemini adds freeform rewrites. Replaces the selection only if it still matches, with notification undo. Sessions warn at 4 minutes and auto-submit at 5.
-- History retention: KEEP / 24 HOURS / NEVER; 24-hour mode prunes old transcripts and audio, NEVER purges both and stops saving.
+- History retention: KEEP / 24 HOURS / NEVER; 24-hour mode prunes old transcripts and legacy audio; NEVER purges both and stops saving. New dictation audio is never written to disk.
 - Resilience: boot receiver restores a deliberately-running bubble; Settings exposes the battery-optimization exemption. Bubble size (small/normal/large) and opacity (60/80/100%) are configurable.
 - Context: app-aware tone uses the package name only. An opt-in **Field Context** switch extracts names/code terms from the focused field for AI polish; passwords and the app's own fields are refused.
 - Tone: app-aware preset from the foreground package name only (chat = casual, email = formal); no screen reading.
@@ -34,13 +34,12 @@ The in-app JNI latency has not been measured yet. See [BENCHMARKS.md](BENCHMARKS
 
 ## Current gaps
 
-1. Device-test the newest build: Command Mode selected-text replacement, inline edit commands, retention (KEEP/24H/NEVER), boot restore, battery exemption, text-field gating, snooze, self-correction/dev-text, numbered lists, and Field Context, including password fields, split screen, and keyboard close/open.
+1. Broader field pass for voice, Command Mode selected-text replacement, inline edits, retention (KEEP/24H/NEVER), boot restore, battery exemption, text-field gating, snooze, self-correction/dev-text, numbered lists, and Field Context, including password fields, split screen, and keyboard close/open.
 2. Re-test all four cloud providers with live keys, including Command Mode on Groq, OpenAI, and Gemini. Gemini response parsing reads `audioTranscription.text`; OpenAI retries `gpt-4o-transcribe` with legacy fields on a 400/404/415/422.
 3. Measure Whistle quality and latency inside the app across the seven languages.
 4. Field-test accented English and noisy environments; the current sample is tiny.
-5. Update screenshots in `docs/screenshots/` to the arcade UI.
-6. Publish the v0.3.0 APK with SHA-256 and release notes.
-7. Remaining parity gaps that need engineering, not just testing: streaming partials, local Hinglish/Telugu breadth, dictionary auto-learn/sync, banking-app stand-down, and per-app web-editor shims. See [FEATURE_PARITY.md](FEATURE_PARITY.md).
+5. Keep the v0.3.0 APK, release notes, and screenshots in sync with the tested commit.
+6. Remaining parity gaps that need engineering, not just testing: streaming partials, local Hinglish/Telugu breadth, dictionary auto-learn/sync, banking-app stand-down, and per-app web-editor shims. See [FEATURE_PARITY.md](FEATURE_PARITY.md).
 
 ## Rust core
 

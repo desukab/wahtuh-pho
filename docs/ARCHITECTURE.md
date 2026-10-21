@@ -295,5 +295,5 @@ The library links `libneedle.a` and bundles `libc++_shared.so`. Model loading is
 
 - `files/models/` — unpacked Whistle model with a version marker
 - `files/history.jsonl` — append-only JSONL, max 300 entries
-- `files/audio/` — optional per-dictation WAVs
+- `files/audio/` — legacy only; no new recordings are written and retention deletes leftovers
 - `shared_prefs/` — settings; API key ciphertext only, with the key in Keystore
