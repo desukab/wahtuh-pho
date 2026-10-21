@@ -139,6 +139,10 @@ Full details: [docs/PRIVACY.md](docs/PRIVACY.md) and [docs/ANDROID_APP.md](docs/
 - App-aware tone covers common chat/email packages and falls back to the selected Default style elsewhere. It uses the package name only, never screen contents. Field Context is a separate opt-in switch, off by default, and requires AI polish.
 - Self-correction heuristics are intentionally conservative; ambiguous corrections still rely on AI polish. Whistle's local accuracy remains the main precision limit.
 
+## Support the project
+
+Wahtuh Pho is built in public with OpenCode, Termux on Android, and cloud compute when available. If you want to help fund a workstation, test devices, and more open-source experiments, see [SUPPORT.md](SUPPORT.md) for the voluntary Solana support address and other ways to help. Contributions are not investments or purchases.
+
 ## License
 
 Apache-2.0. Third-party components, fonts, and model licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
