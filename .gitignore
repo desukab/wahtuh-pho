@@ -1,0 +1,11 @@
+build/
+vendor/
+app/assets/models/
+*.jks
+*.keystore
+local.properties
+.idea/
+.gradle/
+tmp/
+*.apk
+*.aab

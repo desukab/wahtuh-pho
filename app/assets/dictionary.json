@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "description": "Wahtuh Pho built-in vocabulary. Versioned; user entries are layered on top and never rewritten.",
+  "entries": [
+    {"from": "open ai", "to": "OpenAI"},
+    {"from": "chat gpt", "to": "ChatGPT"},
+    {"from": "chatgpt", "to": "ChatGPT"},
+    {"from": "g p t", "to": "GPT"},
+    {"from": "whats app", "to": "WhatsApp"},
+    {"from": "whatsapp", "to": "WhatsApp"},
+    {"from": "wi fi", "to": "Wi-Fi"},
+    {"from": "e mail", "to": "email"},
+    {"from": "google gemini", "to": "Google Gemini"},
+    {"from": "wispr flow", "to": "Wispr Flow"},
+    {"from": "telugu english", "to": "Telugu-English"},
+    {"from": "ఆఫీస్", "to": "ఆఫీసు", "caseSensitive": true, "lang": "te"},
+    {"from": "ప్రాజెక్ట్", "to": "ప్రాజెక్టు", "caseSensitive": true, "lang": "te"},
+    {"from": "మీటింగ్", "to": "మీటింగ్", "caseSensitive": true, "lang": "te"},
+    {"from": "కంప్యూటర్", "to": "కంప్యూటర్", "caseSensitive": true, "lang": "te"},
+    {"from": "ఇంటర్నెట్", "to": "ఇంటర్నెట్", "caseSensitive": true, "lang": "te"},
+    {"from": "డాటా", "to": "డేటా", "caseSensitive": true, "lang": "te"},
+    {"from": "ఫోన్", "to": "ఫోన్", "caseSensitive": true, "lang": "te"}
+  ]
+}
