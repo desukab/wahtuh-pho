@@ -42,6 +42,9 @@ jobs:
       - name: Fetch checksummed offline ASR models
         run: ./scripts/fetch-models.sh
 
+      - name: Test ASR scoring and Telugu normalization
+        run: python3 tests/test_score_asr.py
+
       - name: Run Android text pipeline tests
         run: ./scripts/test.sh
 
