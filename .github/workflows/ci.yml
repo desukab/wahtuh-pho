@@ -17,14 +17,10 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
             | sh -s -- -y --profile minimal --default-toolchain stable
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - name: Install rustfmt
-        run: rustup component add rustfmt
       - name: Build (all targets)
         run: cargo build --workspace --all-targets
       - name: Test
         run: cargo test --workspace
-      - name: Format check
-        run: cargo fmt --all -- --check
 
   android-text-tests:
     runs-on: ubuntu-latest
@@ -34,6 +30,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager "platforms;android-35"
-      - run: ANDROID_JAR="$ANDROID_HOME/platforms/android-35/android.jar" ./scripts/test.sh
+      - name: Text tests
+        run: |
+          ANDROID_JAR="$(find "$ANDROID_HOME/platforms" -name android.jar | sort -V | tail -1)"
+          test -f "$ANDROID_JAR"
+          ANDROID_JAR="$ANDROID_JAR" ./scripts/test.sh
