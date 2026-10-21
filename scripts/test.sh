@@ -11,5 +11,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT/classes"
 javac -encoding UTF-8 -Xlint:-options -cp "$SDK_JAR" -d "$OUT/classes" \
   $(find "$ROOT/app/src/com/wahtuh/pho/text" -name '*.java') \
-  "$ROOT/tests/TextPipelineTest.java"
+  $(find "$ROOT/app/src/com/wahtuh/pho/audio" -name '*.java') \
+  "$ROOT/tests/TextPipelineTest.java" "$ROOT/tests/SpeechAudioTest.java"
 java -cp "$OUT/classes:$SDK_JAR" TextPipelineTest
+java -cp "$OUT/classes:$SDK_JAR" SpeechAudioTest

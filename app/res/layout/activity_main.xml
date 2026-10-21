@@ -1,1045 +1,221 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/wp_bg"
     android:fitsSystemWindows="true">
 
-    <FrameLayout
-        android:id="@+id/home_content"
+    <com.wahtuh.pho.ui.ArcadeBackdrop
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:fillViewport="true"
-            android:paddingBottom="104dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingLeft="20dp"
-                android:paddingTop="14dp"
-                android:paddingRight="20dp"
-                android:paddingBottom="24dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_wave"
-                        android:tint="@color/wp_accent" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="9dp"
-                        android:fontFamily="serif"
-                        android:text="wahtuh"
-                        android:textColor="@color/wp_text"
-                        android:textSize="23sp"
-                        android:textStyle="bold" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1" />
-
-                    <ImageView
-                        android:id="@+id/home_history_button"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:background="@drawable/bg_card2"
-                        android:contentDescription="Transcript history"
-                        android:padding="10dp"
-                        android:src="@drawable/ic_clock"
-                        android:tint="@color/wp_muted" />
-
-                    <ImageView
-                        android:id="@+id/home_settings_button"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:layout_marginLeft="8dp"
-                        android:background="@drawable/bg_card2"
-                        android:contentDescription="Settings"
-                        android:padding="10dp"
-                        android:src="@drawable/ic_gear"
-                        android:tint="@color/wp_muted" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="28dp"
-                    android:fontFamily="serif"
-                    android:lineSpacingExtra="2dp"
-                    android:text="Speak.\nIt types."
-                    android:textColor="@color/wp_text"
-                    android:textSize="38sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Private dictation for English and Telugu. Your voice stays on this phone."
-                    android:textColor="@color/wp_muted"
-                    android:textSize="14sp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:background="@drawable/bg_card"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/status_dot"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:background="@drawable/bg_circle" />
-
-                        <TextView
-                            android:id="@+id/status"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginLeft="8dp"
-                            android:layout_weight="1"
-                            android:text="Ready"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <FrameLayout
-                        android:layout_width="86dp"
-                        android:layout_height="86dp"
-                        android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="16dp"
-                        android:background="@drawable/bg_circle">
-
-                        <ImageView
-                            android:layout_width="34dp"
-                            android:layout_height="34dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_mic"
-                            android:tint="#17151B" />
-                    </FrameLayout>
-
-                    <Button
-                        android:id="@+id/test_button"
-                        android:layout_width="match_parent"
-                        android:layout_height="54dp"
-                        android:layout_marginTop="18dp"
-                        android:background="@drawable/bg_primary"
-                        android:fontFamily="sans"
-                        android:text="Start dictation"
-                        android:textAllCaps="false"
-                        android:textColor="#17151B"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/result"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:background="@drawable/bg_card2"
-                        android:lineSpacingExtra="3dp"
-                        android:minHeight="84dp"
-                        android:padding="14dp"
-                        android:text="Your transcript will appear here."
-                        android:textColor="@color/wp_text"
-                        android:textSize="17sp" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:orientation="horizontal">
-
-                        <Button
-                            android:id="@+id/copy_button"
-                            android:layout_width="0dp"
-                            android:layout_height="44dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_secondary"
-                            android:text="Copy"
-                            android:textAllCaps="false"
-                            android:textColor="@color/wp_text"
-                            android:textSize="14sp" />
-
-                        <Button
-                            android:id="@+id/clear_result_button"
-                            android:layout_width="0dp"
-                            android:layout_height="44dp"
-                            android:layout_marginLeft="10dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_secondary"
-                            android:text="Clear"
-                            android:textAllCaps="false"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/home_setup_card"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Get set up"
-                            android:textColor="@color/wp_text"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Open setup  ›"
-                            android:textColor="@color/wp_accent"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/setup_status"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="7dp"
-                        android:lineSpacingExtra="2dp"
-                        android:text="Voice keyboard: off · Text insertion: off · Floating bubble: permission needed"
-                        android:textColor="@color/wp_muted"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_card"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <TextView
-                            android:id="@+id/stat_words"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="serif"
-                            android:text="0"
-                            android:textColor="@color/wp_text"
-                            android:textSize="30sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="words dictated"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="10dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_card"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <TextView
-                            android:id="@+id/stat_sessions"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="serif"
-                            android:text="0"
-                            android:textColor="@color/wp_text"
-                            android:textSize="30sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="sessions"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Recent"
-                        android:textColor="@color/wp_text"
-                        android:textSize="19sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/recent_view_all"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="View all  ›"
-                        android:textColor="@color/wp_accent"
-                        android:textSize="13sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/home_recent"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="vertical" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Local-only mode"
-                            android:textColor="@color/wp_text"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="Block every cloud request"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <Switch
-                        android:id="@+id/local_only_switch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:thumbTint="@color/wp_accent"
-                        android:trackTint="@color/wp_line" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:gravity="center"
-                    android:text="On-device · Whisper tiny + Vosk Telugu"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </ScrollView>
-    </FrameLayout>
-
-    <FrameLayout
-        android:id="@+id/dictionary_content"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone">
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:paddingBottom="104dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="serif"
-                    android:text="Dictionary"
-                    android:textColor="@color/wp_text"
-                    android:textSize="33sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="Teach Wahtuh the names you actually say. Applied instantly, on device."
-                    android:textColor="@color/wp_muted"
-                    android:textSize="14sp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:background="@drawable/bg_card"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Use my dictionary"
-                            android:textColor="@color/wp_text"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="Exact replacements after transcription"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <Switch
-                        android:id="@+id/dictionary_switch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:thumbTint="@color/wp_accent"
-                        android:trackTint="@color/wp_line" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:letterSpacing="0.12"
-                    android:text="ENTRIES"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <EditText
-                    android:id="@+id/user_dictionary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_input"
-                    android:gravity="top"
-                    android:hint="OpenAI=Open AI&#10;WhatsApp=వాట్సప్"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:lineSpacingExtra="4dp"
-                    android:minHeight="190dp"
-                    android:padding="14dp"
-                    android:textColor="@color/wp_text"
-                    android:textColorHint="@color/wp_muted"
-                    android:textSize="15sp" />
-
-                <Button
-                    android:id="@+id/save_settings_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_primary"
-                    android:text="Save dictionary"
-                    android:textAllCaps="false"
-                    android:textColor="#17151B"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:lineSpacingExtra="2dp"
-                    android:text="One entry per line. Use Name=Replacement, or a single word to keep it. Telugu and English both work."
-                    android:textColor="@color/wp_muted"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </ScrollView>
-    </FrameLayout>
-
-    <FrameLayout
-        android:id="@+id/settings_content"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone">
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:paddingBottom="104dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingLeft="20dp"
-                android:paddingTop="20dp"
-                android:paddingRight="20dp"
-                android:paddingBottom="28dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="serif"
-                    android:text="Settings"
-                    android:textColor="@color/wp_text"
-                    android:textSize="33sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="Local by default. Nothing is uploaded without an explicit cloud choice."
-                    android:textColor="@color/wp_muted"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:letterSpacing="0.12"
-                    android:text="TRANSCRIPTION"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:text="Provider"
-                    android:textColor="@color/wp_text"
-                    android:textSize="13sp" />
-
-                <Spinner
-                    android:id="@+id/provider_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_input"
-                    android:paddingLeft="12dp"
-                    android:paddingRight="12dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="Language"
-                    android:textColor="@color/wp_text"
-                    android:textSize="13sp" />
-
-                <Spinner
-                    android:id="@+id/language_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_input"
-                    android:paddingLeft="12dp"
-                    android:paddingRight="12dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="On-device engine"
-                    android:textColor="@color/wp_text"
-                    android:textSize="13sp" />
-
-                <Spinner
-                    android:id="@+id/engine_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_input"
-                    android:paddingLeft="12dp"
-                    android:paddingRight="12dp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="AI cleanup"
-                            android:textColor="@color/wp_text"
-                            android:textSize="14sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="Cloud provider only · sends final text, not audio"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <Switch
-                        android:id="@+id/cleanup_switch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:thumbTint="@color/wp_accent"
-                        android:trackTint="@color/wp_line" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:letterSpacing="0.12"
-                    android:text="TEXT"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_card"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Punctuation and spacing"
-                            android:textColor="@color/wp_text"
-                            android:textSize="14sp" />
-
-                        <Switch
-                            android:id="@+id/punctuation_switch"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:thumbTint="@color/wp_accent"
-                            android:trackTint="@color/wp_line" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Remove filler words"
-                            android:textColor="@color/wp_text"
-                            android:textSize="14sp" />
-
-                        <Switch
-                            android:id="@+id/fillers_switch"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:thumbTint="@color/wp_accent"
-                            android:trackTint="@color/wp_line" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:letterSpacing="0.12"
-                    android:text="CLOUD API KEY"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/key_status"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="No cloud key stored"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="12sp" />
-
-                <EditText
-                    android:id="@+id/api_key"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_input"
-                    android:hint="Paste API key"
-                    android:inputType="textPassword"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
-                    android:textColor="@color/wp_text"
-                    android:textColorHint="@color/wp_muted"
-                    android:textSize="14sp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/save_key_button"
-                        android:layout_width="0dp"
-                        android:layout_height="46dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_secondary"
-                        android:text="Save key"
-                        android:textAllCaps="false"
-                        android:textColor="@color/wp_text"
-                        android:textSize="14sp" />
-
-                    <Button
-                        android:id="@+id/clear_key_button"
-                        android:layout_width="0dp"
-                        android:layout_height="46dp"
-                        android:layout_marginLeft="10dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_secondary"
-                        android:text="Remove"
-                        android:textAllCaps="false"
-                        android:textColor="@color/wp_muted"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Keys are encrypted with the Android Keystore. Audio is only sent when you pick a cloud provider with local-only off."
-                    android:textColor="@color/wp_muted"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:letterSpacing="0.12"
-                    android:text="PRIVACY &amp; DATA"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_card"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Save each recording"
-                            android:textColor="@color/wp_text"
-                            android:textSize="14sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="App-private audio/ folder"
-                            android:textColor="@color/wp_muted"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <Switch
-                        android:id="@+id/keep_audio_switch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:thumbTint="@color/wp_accent"
-                        android:trackTint="@color/wp_line" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/history_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Open transcript history"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_text"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/clear_history_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Clear transcript history"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_danger"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/diagnostics_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Run diagnostics and benchmarks"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_text"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:letterSpacing="0.12"
-                    android:text="SETUP"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <Button
-                    android:id="@+id/enable_ime_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Enable voice keyboard"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_text"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/pick_ime_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Choose keyboard"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_text"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/accessibility_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Enable text insertion"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_text"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/bubble_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Start floating bubble"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_text"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:letterSpacing="0.12"
-                    android:text="ON-DEVICE MODELS"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/model_status"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Checking bundled models…"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="12sp" />
-
-                <Button
-                    android:id="@+id/prepare_models_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_secondary"
-                    android:text="Prepare on-device models"
-                    android:textAllCaps="false"
-                    android:textColor="@color/wp_text"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="26dp"
-                    android:gravity="center"
-                    android:text="Wahtuh Pho 0.1.0 · local-first"
-                    android:textColor="@color/wp_muted"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </ScrollView>
-    </FrameLayout>
+        android:layout_height="match_parent" />
 
     <LinearLayout
-        android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
-        android:layout_height="74dp"
-        android:layout_gravity="bottom"
-        android:background="@drawable/bg_nav"
-        android:orientation="horizontal"
-        android:paddingLeft="18dp"
-        android:paddingRight="18dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
         <LinearLayout
-            android:id="@+id/tab_home"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:id="@+id/app_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="10dp"
+            android:paddingTop="8dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="8dp">
 
             <ImageView
-                android:id="@+id/tab_home_icon"
-                android:layout_width="23dp"
-                android:layout_height="23dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_home"
-                android:tint="@color/wp_accent" />
+                android:id="@+id/menu_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Menu"
+                android:padding="13dp"
+                android:src="@drawable/ic_menu"
+                android:tint="@color/wp_text" />
 
-            <TextView
-                android:id="@+id/tab_home_label"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Home"
-                android:textColor="@color/wp_accent"
-                android:textSize="10sp" />
-        </LinearLayout>
+                android:layout_marginLeft="4dp"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-        <LinearLayout
-            android:id="@+id/tab_dictionary"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_wave"
+                    android:tint="@color/wp_accent" />
 
-            <ImageView
-                android:id="@+id/tab_dictionary_icon"
-                android:layout_width="23dp"
-                android:layout_height="23dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_book"
-                android:tint="@color/wp_muted" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="9dp"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.08"
+                    android:text="WAHTUH"
+                    android:textColor="@color/wp_text"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tab_dictionary_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Dictionary"
-                android:textColor="@color/wp_muted"
-                android:textSize="10sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/tab_settings"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="6dp"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.08"
+                    android:text="PHO"
+                    android:textColor="@color/wp_accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <ImageView
-                android:id="@+id/tab_settings_icon"
-                android:layout_width="23dp"
-                android:layout_height="23dp"
-                android:contentDescription="@null"
+                android:id="@+id/top_settings_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Settings"
+                android:padding="13dp"
                 android:src="@drawable/ic_gear"
-                android:tint="@color/wp_muted" />
+                android:tint="@color/wp_text" />
+        </LinearLayout>
 
-            <TextView
-                android:id="@+id/tab_settings_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Settings"
-                android:textColor="@color/wp_muted"
-                android:textSize="10sp" />
+        <FrameLayout
+            android:id="@+id/content"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <LinearLayout
+            android:id="@+id/bottom_nav"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_nav"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingLeft="6dp"
+            android:paddingRight="6dp">
+
+            <LinearLayout
+                android:id="@+id/nav_home"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/nav_home_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_home"
+                    android:tint="@color/wp_accent" />
+
+                <TextView
+                    android:id="@+id/nav_home_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.06"
+                    android:text="HOME"
+                    android:textColor="@color/wp_accent"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_words"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/nav_words_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_book"
+                    android:tint="@color/wp_muted" />
+
+                <TextView
+                    android:id="@+id/nav_words_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.06"
+                    android:text="WORDS"
+                    android:textColor="@color/wp_muted"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_snips"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/nav_snips_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_snippets"
+                    android:tint="@color/wp_muted" />
+
+                <TextView
+                    android:id="@+id/nav_snips_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.06"
+                    android:text="SNIPS"
+                    android:textColor="@color/wp_muted"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_style"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/nav_style_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_style"
+                    android:tint="@color/wp_muted" />
+
+                <TextView
+                    android:id="@+id/nav_style_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.06"
+                    android:text="STYLE"
+                    android:textColor="@color/wp_muted"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

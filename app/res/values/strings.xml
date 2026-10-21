@@ -3,9 +3,7 @@
     <string name="app_name">Wahtuh Pho</string>
     <string name="ime_label">Wahtuh Pho voice keyboard</string>
     <string name="accessibility_label">Wahtuh Pho text insertion</string>
-    <string name="accessibility_description">Inserts dictated text into the focused field. Wahtuh Pho only reads the focused editable field when you ask it to insert text.</string>
-    <string name="diagnostics">Diagnostics</string>
-    <string name="history">History</string>
+    <string name="accessibility_description">Shows the dictation bubble only when an editable, non-password field is focused. Wahtuh Pho reads text only when you ask it to insert, and never reads password fields.</string>
     <string name="ime_subtype_en">English (United States)</string>
-    <string name="ime_subtype_te">Telugu</string>
+    <string name="ime_subtype_multi">Dictation · 7 languages</string>
 </resources>

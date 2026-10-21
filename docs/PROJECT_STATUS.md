@@ -1,101 +1,55 @@
 # Wahtuh Pho — Project Status
 
-**Mission:** open-source, Rust-powered, offline-first voice dictation
-(Wispr Flow alternative). English, Telugu, and Telugu–English code-switching.
-**Target repo:** https://github.com/desukab/wahtuh-pho (published 2026-10-19) · **Last updated:** 2026-10-20 (IST, Deepgram head-to-head measured)
+**Mission:** open-source, offline-first voice dictation for Android, with an arcade-inspired UI.
+**Repo:** https://github.com/desukab/wahtuh-pho · **Updated:** 2026-10-22
 
-> Honesty rule: only measured numbers appear here. Anything not yet run is
-> marked **not run** — no accuracy, latency, or benchmark figures exist.
+> Honesty rule: only measured or directly observed results appear here. The v0.3.0 APK compiles and passes local tests. Bubble recording, timer/waveform, insertion, and all three arcade games were exercised on the vivo V2251. The newest features in this build still need a fresh device pass: Command Mode, inline edit commands, retention controls, boot recovery, Field Context, and selected-text replacement.
 
-## Android app shipped (2026-10-20)
+## Android app — v0.3.0
 
-A working Android APK now exists alongside this Rust workspace: on-device hybrid
-Whisper tiny + Vosk Telugu, floating bubble, IME keyboard, accessibility insertion,
-transcript dashboard, encrypted cloud keys, and diagnostics. It is built without
-Gradle and does not link the Rust crates. Evidence: `docs/BENCHMARKS.md`,
-`docs/ANDROID_APP.md`, `README.md`. Diagnostics on a vivo V2251 / Android 15:
-10/10 self-tests; English WER 0.0% / RTF 0.381; synthetic Telugu WER 0.0% /
-RTF 0.197 warm. Human Telugu remains unmeasured.
+- Local ASR: Cactus Compute Whistle, 16.9 MB, CPU.
+- Languages: English, German, French, Spanish, Italian, Dutch, Polish, plus auto-detect.
+- UI: 90s arcade theme; Home, Words, Snips, Style tabs; onboarding; dark floating bubble.
+- Insertion: accessibility paste-first with verification, fallback, cursor placement, undo. Search/note placeholders such as “Search YouTube”, “Ask Google”, and “Note” are treated as empty fields instead of existing text.
+- Cloud: Groq, Gemini, Deepgram, OpenAI with user keys encrypted by Android Keystore.
+- Text: punctuation, filler removal, dictionary, snippets, five styles, email dictation, optional text-only cloud cleanup.
+- Precision helpers: local self-corrections (`actually`, `no wait`, `I mean`, `scratch that`), spoken developer identifiers (`camelCase`, `snake_case`, `PascalCase`, `kebab-case`, `dot.case`), file tags (`@main.py`), numbered lists, and local inline edits (delete last sentence/word, bullet/numbered lists, case changes). Tests: **51/51** text, **11/11** VAD.
+- Command Mode: select text, hold the bubble, and speak an edit. On-device handles case, list, and delete commands; Groq, OpenAI, or Gemini adds freeform rewrites. Replaces the selection only if it still matches, with notification undo. Sessions warn at 4 minutes and auto-submit at 5.
+- History retention: KEEP / 24 HOURS / NEVER; 24-hour mode prunes old transcripts and audio, NEVER purges both and stops saving.
+- Resilience: boot receiver restores a deliberately-running bubble; Settings exposes the battery-optimization exemption. Bubble size (small/normal/large) and opacity (60/80/100%) are configurable.
+- Context: app-aware tone uses the package name only. An opt-in **Field Context** switch extracts names/code terms from the focused field for AI polish; passwords and the app's own fields are refused.
+- Tone: app-aware preset from the foreground package name only (chat = casual, email = formal); no screen reading.
+- Bubble gating: accessibility watches keyboard/window changes and shows the bubble only for an editable, non-password field in another app. Drag it onto a 5 MIN or 10 MIN X target to snooze.
+- Cleanup routing: if transcription uses Deepgram, polish can use the first configured Groq, OpenAI, or Gemini key; the audio still goes only to Deepgram.
+- Build: Gradle-free, `aapt2` + `javac` + D8 + `apksigner`; 18 MB APK.
+- JNI: `libwhistle_jni.so` links `libneedle.a`; bundled with `libc++_shared.so`.
 
+## Measured locally (CLI, vivo V2251 / Android 15)
 
-## Completed milestones
+- `0.wav` 3.65 s — exact transcript; 1.3–3.2 s warm with 2 threads; ~8.9 s cold.
+- `en1.wav` — one substitution and spacing errors (“shed” for “schedule”, “to morrow”).
+- Telugu — romanised garbage; unsupported, removed from the app.
 
-| Date | Milestone | Evidence |
-|---|---|---|
-| 2026-10-19 | Environment recon | `docs/ENVIRONMENT.md` — actual observed outputs |
-| 2026-10-19 | REA inspection | `docs/REA_NOTES.md` — REA 6.7.0 shallow-cloned to `/tmp/rea` (reference only) |
-| 2026-10-19 | Wispr Flow clean-room research | `docs/WISPR_FLOW_RESEARCH.md` — public sources only, paraphrased; no APK downloaded, nothing proprietary copied |
-| 2026-10-19 | Feature parity matrix | `docs/FEATURE_PARITY.md` — all entries `planned` |
-| 2026-10-19 | Android design (thin Kotlin shell + JNI) | `docs/ANDROID.md` — design documentation only, no compiling code |
-| 2026-10-19 | Engine evaluation (whisper.cpp vs sherpa-onnx vs Vosk) | `docs/ENGINE_EVALUATION.md` — paper comparison, decision pending on-device benchmark; **no benchmarks run** |
-| 2026-10-19 | Rust workspace scaffold | `Cargo.toml` + 6 crates (`wahtuh-audio`, `wahtuh-transcribe`, `wahtuh-normalize`, `wahtuh-providers`, `wahtuh-config`, `wahtuh-core`); `docs/ARCHITECTURE.md`; baseline `cargo test --workspace` = **49 tests, all green** |
-| 2026-10-19 | Phase C1: MVP hardening | `crates/wahtuh-core/tests/end_to_end.rs` (6 integration tests: full pipeline → persisted history, mid-session cancellation, buffer-limit error path, `local_only` blocking cloud selection, Telugu/code-switch through normalization); strengthened unit tests (chunker exact-boundary overlap, dictionary migration gate, history eviction + disk rewrite, config save refusing credentials); `docs/EVALUATION.md` (plan) |
-| 2026-10-19 | Phase F: publish prep | `LICENSE` (Apache-2.0), `README.md` (honest implemented-vs-planned table), `docs/PRIVACY.md`, `.github/workflows/ci.yml`, `.gitignore`; local git repo initialized (`git init -b main`, 5 meaningful commits, builder identity); `cargo test --workspace` = **71 passed, 0 failed, 1 ignored (doc-test)**. See [License rationale](#license-rationale) and [Publish blockers](#publish-blockers) |
-| 2026-10-19 | Published to GitHub | `desukab/wahtuh-pho` created by the user; 29/30 files pushed via the GitHub API (`push_files`, 4 commits — raw SSH is blocked by the VM proxy). `.github/workflows/ci.yml` NOT published: GitHub App lacks the `workflows` permission (403) — must be added manually via web UI |
-| 2026-10-19 | Real local transcription (no stubs) | `WhisperCppEngine` in `wahtuh-transcribe` via **whisper-rs 0.16.0** (bundled whisper.cpp v1.8.3); model path from `$WAHTUH_MODEL_PATH` or `~/.cache/wahtuh/models/`; mid-inference cancellation via abort callback; `cargo test --workspace` = **74 passed, 0 failed, 1 ignored** |
-| 2026-10-19 | Model weights downloaded + verified | Multilingual `ggml-tiny.bin` (74 MB), `ggml-base.bin` (141 MB), `ggml-small.bin` (465 MB) from Hugging Face `ggerganov/whisper.cpp`; SHA256 recorded; ggml magic verified. Stored at `~/workspace/models/` (never in git) |
-| 2026-10-19 | Evaluation corpus (licensed audio) | 31 clips, all 16 kHz mono: `jfk.wav` + 15 EN + 15 TE from Google FLEURS (**CC-BY-4.0**, cite arXiv:2206.12139). Common Voice was unreachable (Mozilla removed the files from Hugging Face in Oct 2025; Data Collective needs interactive sign-in). Manifest: `docs/eval_manifest.json` |
-| 2026-10-19 | Measured benchmarks (93 runs) | 3 models × 31 clips on whisper.cpp 1.8.3, 2-vCPU x86_64, no GPU. **EN mean WER: tiny 13.9% / base 11.8% / small 7.5%.** TE: all three models fail (117–128% mean WER). Scorer: jiwer 4.0.0. Full table in `docs/EVALUATION.md`; raw runs in `docs/bench_runs_{tiny,base,small}.jsonl` |
-| 2026-10-20 | Deepgram nova-3 head-to-head (61 runs, $0.0479) | Same 31 FLEURS clips via `nova-3` (`te`/`en`/`multi`). **EN 8.6% / TE 31.1% WER; `multi` fails Telugu (121.9%) — needs `language=te`.** Deepgram is the only tested engine that transcribes Telugu at all. Scorer: jiwer 4.0.0. Full table in `docs/EVALUATION.md` §7; raw runs in `docs/bench_runs_deepgram.jsonl`; runner in `tools/deepgram_bench.py` |
+The in-app JNI latency has not been measured yet. See [BENCHMARKS.md](BENCHMARKS.md).
 
-## License rationale
+## Current gaps
 
-**Apache-2.0.** It is a permissive license that allows commercial use and
-modification while keeping the ecosystem open for contributions; its explicit
-patent grant protects both contributors and users against patent litigation;
-and it is compatible with the project's MIT-licensed dependencies and planned
-integrations (whisper.cpp is MIT, whisper-rs is MIT/Apache-2.0). That
-combination makes it the right fit for an open-source Wispr Flow alternative
-that should stay open whether it is built on by hobbyists or companies.
+1. Device-test the newest build: Command Mode selected-text replacement, inline edit commands, retention (KEEP/24H/NEVER), boot restore, battery exemption, text-field gating, snooze, self-correction/dev-text, numbered lists, and Field Context, including password fields, split screen, and keyboard close/open.
+2. Re-test all four cloud providers with live keys, including Command Mode on Groq, OpenAI, and Gemini. Gemini response parsing reads `audioTranscription.text`; OpenAI retries `gpt-4o-transcribe` with legacy fields on a 400/404/415/422.
+3. Measure Whistle quality and latency inside the app across the seven languages.
+4. Field-test accented English and noisy environments; the current sample is tiny.
+5. Update screenshots in `docs/screenshots/` to the arcade UI.
+6. Publish the v0.3.0 APK with SHA-256 and release notes.
+7. Remaining parity gaps that need engineering, not just testing: streaming partials, local Hinglish/Telugu breadth, dictionary auto-learn/sync, banking-app stand-down, and per-app web-editor shims. See [FEATURE_PARITY.md](FEATURE_PARITY.md).
 
-## Publish blockers
+## Rust core
 
-1. **GitHub repo creation failed, then resolved manually (2026-10-19):** `create_repository` for
-   `desukab/wahtuh-pho` returned `403 Resource not accessible by integration`
-   from `POST https://api.github.com/user/repos`. The user created the repo
-   manually and added the VM's SSH key; raw SSH is blocked by the VM proxy,
-   so the 29 publishable files were pushed via the GitHub API (`push_files`,
-   4 commits, each user-approved). Verified with `list_commits`.
-   → **Still needs user:** `.github/workflows/ci.yml` could NOT be pushed —
-   the GitHub App lacks the `workflows` permission (403 on any tree
-   containing it). Add it manually: repo → Add file → Upload files →
-   `.github/workflows/ci.yml` (content is in the local repo).
-2. Toolchain note: actual measured toolchain is `rustc 1.99.1` / `cargo
-   1.99.1` (via rustup). `whisper-rs-sys` needs `libclang` for bindgen
-   (installed via `apt-get install libclang-dev` on this VM); fresh
-   environments need it before building.
+The `crates/` workspace is independent of the shipped APK: audio chunking, engine trait with a whisper.cpp backend, normalization/dictionary, cloud request builders, local-only config, session/history. Last recorded run: 74 tests passed, 1 ignored. It still targets Whisper/Telugu research and is not wired to the app.
 
-## Current status per workstream
+## Historical notes
 
-| Workstream | Status |
-|---|---|
-| `wahtuh-audio` (PCM, chunker, bounded buffer) | Scaffolded + tested (12 unit tests) |
-| `wahtuh-transcribe` (`Engine` trait, `MockEngine`, **`WhisperCppEngine`**) | Real local engine via whisper-rs 0.16.0 (whisper.cpp v1.8.3 bundled); `$WAHTUH_MODEL_PATH` / `~/.cache/wahtuh/models/`; abort-callback cancellation; zero network in local path. 10 unit tests (3 whisper tests skip cleanly without a model). `LocalEngine` stub retained for its loud-failure contract |
-| `wahtuh-normalize` (cleanup, Telugu preservation, dictionary) | Scaffolded + tested (11 unit tests) |
-| `wahtuh-providers` (Groq/Gemini/OpenAI/Deepgram adapters) | Scaffolded + tested (20 unit tests). No HTTP transport (std-only); unreachable when `local_only`. Deepgram `nova-3` adapter added 2026-10-19 (`Authorization: Token` scheme, `te`/`en`/`multi` language allow-list) — **benchmarked live 2026-10-20** (61 runs, see Evaluation) |
-| `wahtuh-config` (config + local-only guarantee) | Scaffolded + tested (9 unit tests) |
-| `wahtuh-core` (session, history) | Scaffolded + tested (10 unit + 6 integration tests) |
-| `wahtuh-jni` Android bridge | Not started (design in `docs/ANDROID.md` only) |
-| Android app shell | Not started |
-| Evaluation / benchmarks | **Measured 2026-10-19:** 93 runs (3 models × 31 clips). EN WER tiny 13.9% / base 11.8% / small 7.5%; TE 117–128% WER (all models fail Telugu — see Blockers). `docs/EVALUATION.md` + raw `docs/bench_runs_{tiny,base,small}.jsonl`. **Measured 2026-10-20:** Deepgram nova-3 head-to-head, 61 runs, $0.0479. EN 8.6% / TE 31.1% WER; `multi` fails Telugu (121.9%) — needs `language=te`. Deepgram is the only tested engine that transcribes Telugu. `docs/EVALUATION.md` §7 + raw `docs/bench_runs_deepgram.jsonl`; runner `tools/deepgram_bench.py` |
-| Deepgram connector (`custom.deepgram`) | Connector doc + `bin/deepgram_listen.py` helper authored 2026-10-19. **Known bug (2026-10-20): the surrogate auth path returns 401 on valid keys** — a key proven working via direct curl was rejected 5× through the connector. Root cause still open; the 2026-10-20 benchmark ran outside the connector with a one-time user-provided key (transient, never stored). Do not trust the connector for live calls until the surrogate path is fixed |
-| GitHub repo `desukab/wahtuh-pho` | **Published** 2026-10-19 (4 API commits). `.github/workflows/ci.yml` still missing — needs manual upload (App lacks `workflows` permission) |
-| Competitor teardown (user's licensed APK, static only) | **Done 2026-10-19:** `docs/ANDROID_UX_TEARDOWN.md` (screen inventory, onboarding state machine, bubble states, permission patterns), `docs/COMPETITOR_ARCHITECTURE.md` (gRPC streaming client, a11y+IME insertion engine, FGS/watchdog keepalive, SDK inventory), `docs/FEATURE_PARITY.md` corrected with app-grounded evidence. Raw decompiled output quarantined at `~/workspace/analysis/wisprflow/` (never in repo). |
-| UI direction | **Decided 2026-10-19:** retro 8-bit games vibe for UI/UX chrome and feedback; typeface Fredoka (Latin) + Baloo Tammudu 2 (Telugu companion) — NOT pixel fonts. Concept: `docs/UI_CONCEPT_8BIT.md` |
-
-## Blockers
-
-1. **Telugu transcription is effectively unusable with whisper tiny/base/small** (measured 117–128% mean WER on the FLEURS Telugu subset; hypotheses are script gibberish/hallucinations). Do NOT ship or claim Telugu support on these models. **Answered 2026-10-20 for the cloud tier:** Deepgram Nova-3 with `language=te` measures 31.1% mean WER — the only tested engine that transcribes Telugu at all (see `docs/EVALUATION.md` §7). `language=multi` does NOT handle Telugu (121.9% WER). Open for the local tier: try `large` variants, sherpa-onnx/Vosk — or the Adalat AI Koyal pilot per `docs/STRATEGY.md`.
-2. **No ARM64 Android device** — the only latency/RSS numbers that matter for the ship decision cannot be measured yet.
-3. **No Android SDK/NDK** in this environment — required before the JNI bridge or any Android build.
-4. **Code-switching not evaluated** — no Telugu-English code-switch clips in the corpus; nothing was invented to fill the gap.
-5. `.github/workflows/ci.yml` not on GitHub yet — 403, the GitHub App lacks the `workflows` permission. Manual upload needed (see Publish blockers).
-6. Common Voice is no longer on Hugging Face (files removed Oct 2025); a Mozilla Data Collective account (interactive sign-in) would be needed for CC0 clips.
-
-## Next steps (in order)
-
-1. Upload `.github/workflows/ci.yml` manually via the GitHub web UI (one file, content in local repo).
-2. **Done 2026-10-20:** Deepgram head-to-head benchmark ran (61 runs, $0.0479) and is recorded in `docs/EVALUATION.md` §7. Telugu is answered for the cloud tier (31.1% WER with `language=te`).
-3. Investigate Telugu locally: benchmark whisper `large` (or `large-v3-turbo` when available in ggml) and/or sherpa-onnx models on the Telugu subset before any Telugu claim.
-3. Install Android SDK/NDK; build the `wahtuh-jni` bridge; measure on an ARM64 device.
-4. Then: Android app shell, text-insertion spike, provider opt-in transport.
+- v0.1.0 shipped Whisper tiny + Vosk Telugu.
+- v0.2.0 moved to Whisper base; Telugu remained unusable locally.
+- v0.3.0 replaced both with Whistle and the arcade UI, dropping Telugu and all sherpa/Vosk/Kotlin/JNA dependencies.
+- v0.3.0 added adaptive VAD, offline arcade games, editable-field bubble gating, drag-to-snooze, and provider-independent text cleanup routing.
+- Prior research artifacts: `docs/WISPR_FLOW_RESEARCH.md`, `docs/ENGINE_EVALUATION.md`, `docs/EVALUATION.md`, `docs/REA_NOTES.md`.

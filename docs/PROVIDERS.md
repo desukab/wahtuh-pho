@@ -173,16 +173,37 @@ API keys are the user's own credentials. Design for the Android app layer:
 - Convention for env-var-based setups (desktop/CI): `WAHTUH_<PROVIDER>_API_KEY`
   (e.g. `WAHTUH_GROQ_API_KEY`), read via `Config::credentials_from_env`.
 
+## Android app behavior (2026-10-22)
+
+The shipped Android app implements the providers directly in
+`app/src/com/wahtuh/pho/cloud/CloudTranscriber.java`; the Rust adapters
+remain a separate research crate.
+
+- **Gemini transcription** uses `audioTranscriptionConfig` on
+  `gemini-3.5-transcribe`. The response parser accepts the transcript from
+  either `parts[].text` or `parts[].audioTranscription.text`; some
+  responses contain only the latter.
+- **OpenAI transcription** defaults to `gpt-transcribe` with
+  `languages[]` and `keywords[]`. On a 400/404/415/422 response it retries
+  once with `gpt-4o-transcribe` and the legacy `language`/`prompt` fields.
+- **Deepgram transcription** uses Nova-3 with raw WAV upload.
+- **Cleanup is vendor-independent.** Transcription and polish may use
+  different providers. If Deepgram is the transcription provider, the app
+  looks for a configured Groq, OpenAI, or Gemini key and sends only the
+  final text there. If no such key exists, deterministic local cleanup
+  still runs and the AI polish toggle stays off with an explanation.
+
 ## AI cleanup / post-processing is separate and optional
 
-Transcription returns a **verbatim transcript** — exactly what the provider
-returned (the Gemini prompt explicitly asks for verbatim output with no
-commentary or reformatting). Any AI-powered cleanup — punctuation
-restoration, filler-word removal, formatting, summarization — is a
-**separate, opt-in step** that the user enables explicitly. It is never
-applied silently to transcripts, and it never changes what the provider
-returned without the user's knowledge. (This separation also keeps the
-privacy story clean: cleanup would be a second, distinct data use.)
+Transcription returns a **verbatim transcript**. Any AI-powered cleanup —
+punctuation restoration, filler-word removal, formatting, summarization —
+is a **separate, opt-in step** that the user enables explicitly. It sends
+only final text, never audio, and may use a different provider key from the
+one used for transcription. The raw transcript and cleaned result are both
+kept in history, so the change is inspectable. (This separation also keeps
+the privacy story clean: cleanup is a second, distinct data use.) The
+off-by-default **Field Context** switch adds a short list of extracted
+names/code terms to that text request; it never sends surrounding prose.
 
 ## Error taxonomy
 

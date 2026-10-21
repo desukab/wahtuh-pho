@@ -1,47 +1,78 @@
-# Feature Parity Matrix — Wispr Flow vs Wahtuh Pho
+# Feature Parity — Wispr Flow vs Wahtuh Pho (Android)
 
-**Date:** 2026-10-19 · **Basis:** [WISPR_FLOW_RESEARCH.md](WISPR_FLOW_RESEARCH.md)
-(clean-room research) **+ app-grounded corrections from static analysis of the
-competitor's Android APK** (`com.wispr.flowapp` v2.6.2 — see
-[ANDROID_UX_TEARDOWN.md](ANDROID_UX_TEARDOWN.md) and
-[COMPETITOR_ARCHITECTURE.md](COMPETITOR_ARCHITECTURE.md)). The Wispr Flow
-column reflects publicly documented behavior plus structurally observed app
-capabilities, paraphrased — no code, assets, or text copied.
+**Updated:** 2026-10-22 · **Basis:** clean-room public research in
+[WISPR_FLOW_RESEARCH.md](WISPR_FLOW_RESEARCH.md), the static Android teardown in
+[ANDROID_UX_TEARDOWN.md](ANDROID_UX_TEARDOWN.md), and the shipped app source.
+Wispr Flow behavior is paraphrased from public documentation and observed app
+structure. No code, assets, or copy were taken.
 
-**Status values:** `planned` · `in-progress` · `done` · `not-planned`
+**Status values:** `done` · `partial` · `gap` · `deliberate`
 
-**Honesty note:** the Wahtuh Pho MVP is not built yet. As of 2026-10-19 the
-workspace is a Rust scaffold: the six core crates compile and their 71 tests
-pass, but `LocalEngine` is a stub (no model weights, no native backend), there
-is no Android app shell, and no evaluation benchmarks have been run. Nothing
-below is marked `done` — that would be a fabrication. Nothing is `in-progress`
-either, since implementation phases beyond the scaffold have not started.
+## Current matrix
 
-| Feature | Wispr Flow (public info) | Wahtuh Pho MVP target | Status |
+| Capability | Wispr Flow (public/observed) | Wahtuh Pho 0.3.0 | Status |
 |---|---|---|---|
-| Offline local transcription | None — cloud-only. Official data-controls page: "Transcription always occurs on the cloud." Internet required for every dictation. | Core differentiator: on-device transcription (Rust core + local model) with zero network requirement | planned |
-| Mic recording | Push-to-talk (hold hotkey / hold floating bubble), plus hands-free double-tap mode reported by reviewers; whisper mode for quiet spaces (official) | Push-to-talk recording via Android mic; hands-free toggle as stretch goal | planned |
-| Text insertion into apps | Any app with a text field. Android: floating bubble + Accessibility service (minimal event subscription, gesture support); **also ships its own IME as a fallback insertion path** (confirmed in APK). Self-disables in banking apps; per-app compatibility shims; web-editor handling. | Android-first: floating bubble + Accessibility service (same approach), with an IME/keyboard option evaluated later | planned |
-| Auto-punctuation / formatting | Auto-punctuation, capitalization, paragraphing, numbered lists, name spelling from context; code-syntax awareness (official) | Auto-punctuation and capitalization; lists/formatting as follow-up | planned |
-| Voice editing commands | Inline commands while dictating ("make that a bullet list"); Command Mode (Pro-only): highlight text, speak rewrite instruction ("make this shorter", "delete the last sentence") | Basic inline editing commands post-MVP (e.g. "new paragraph", "delete that"); full Command-Mode-style rewrite needs cloud LLM — deferred | planned |
-| Transcript history | "Recent activity"/"History" when storage settings allow; local device history (keep / auto-delete 24h / never), separate cloud history; per-session caps (20 min desktop, ~5 min Android) | Local-only transcript history on device, user-clearable, no cloud | planned |
-| English support | Full; tone Styles limited to "English and desktop only" (official) | Full English support | planned |
-| Telugu support | No official confirmation found. One independent reviewer lists Telugu among available regional languages; one article describes Telugu localization as planned. **App-grounded: zero Telugu (or other Indian-language) strings in the APK's 500 string resources** — no in-app evidence of Telugu support. | Native Telugu transcription | planned |
-| Telugu–English code-switching | No evidence found anywhere (officially supported code-switching is Hinglish only, per Play Store listing). **App-grounded: no Hinglish/code-switch strings in the APK either.** | Tenglish (Telugu↔English mix) code-switching as a headline feature | planned |
-| Custom vocabulary | Personal dictionary (auto-learns corrections, manual adds), snippets (voice shortcuts expanding to text blocks), cross-device sync; shared dictionary/snippets on Teams plan | Custom vocabulary / personal dictionary, local-only | planned |
-| Cloud provider options | None — proprietary cloud only, no BYOK, no provider choice | Optional cloud provider fallback (opt-in, user-configured) for heavy tasks; local remains default | planned |
-| Privacy (local-only mode) | No local-only mode. Best case is "zero retention" config: audio discarded after cloud transcription, model training off, cloud storage off — but audio still leaves the device every dictation | Local-only by default: audio never leaves the device; no account, no telemetry | planned |
-| ARM64 Android support | Android 13+ via Google Play (package `com.wispr.flowapp`); ARM64 build not explicitly claimed — inferred from Play distribution | Native ARM64 Android target (primary MVP platform) | planned |
-| iOS / desktop apps | Mac, Windows, iPhone (all officially supported) | Not in MVP scope — Android first | not-planned |
-| Subscription / paywall | Freemium: free word caps (2,000/wk desktop, 1,000/wk iPhone, unlimited Android limited-time); Pro $15/mo or $144/yr; Teams $10–12/user/mo; Enterprise custom | Free and open-source; no accounts, no word caps, no paywall | not-planned |
-| Wake word ("Hey Flow") | Reported by third-party reviews as Pro feature; not confirmed on official pages. **App-grounded: no wake-word strings in the APK.** | Not in MVP | not-planned |
-| Meeting notetaker | Notetaker feature (meeting transcripts/summaries; reviewers note Mac-only). **App-grounded: notetaker string resources ARE present in the Android APK** — at least partially shipped on Android, not Mac-only. | Not in MVP | not-planned |
-| LinkedIn integration | Not in public research. **App-grounded: dedicated LinkedIn UI module + OAuth deep link in the APK** — exists as a real integration. | Not in MVP | not-planned |
-| Usage dashboards / stats | Team usage dashboards (official, Teams); per-user word stats reported by reviewers | Basic local usage stats (stretch goal) | not-planned |
+| On-device transcription | Never. Cloud only. | Whistle 16.9 MB CPU model, offline by default, cannot silently fall back | **done (and beyond)** |
+| Cloud transcription | Proprietary cloud only | Groq, OpenAI, Gemini, Deepgram with user keys, opt-in | **done** |
+| Push-to-talk | Hold bubble/hotkey | Hold the floating bubble; 380 ms threshold; release transcribes and inserts | **done** |
+| Hands-free toggle | Tap-toggle mode | Tap the bubble to start; tap again to stop | **done** |
+| Live waveform / state UI | Waveform, processing, error, repair, snoozed | Waveform, timer, working/error states, snooze | **done** |
+| Auto punctuation / capitalization | Yes | Yes, plus terminal punctuation and style rules | **done** |
+| Filler removal / backtracking | Yes | Fillers and false-start debounce | **done** |
+| Self-corrections | Real-time understanding | Local numbers, names, noun phrases, clauses, sentences | **done** |
+| Numbered lists | Yes | Spoken `first/second/third` and `make that a numbered list` | **done** |
+| Bullet lists | Yes | `make that a bullet list` and spoken bullet punctuation | **done** |
+| Voice edit commands | Inline commands + Command Mode (Pro) | Local: delete last sentence/word, bullets, numbers, case. Selected-text Command Mode: local subset or cloud freeform | **done** |
+| Developer dictation | Syntax, file names, code formatting | `camelCase`, `snake_case`, `PascalCase`, `kebab-case`, `dot.case`, `@file.py` | **done** |
+| Tone / styles | Styles, English + desktop only | 5 styles plus app-aware tone from the foreground package only | **done** |
+| Context awareness | Reads limited on-screen text | Opt-in Field Context extracts names/code terms only; never passwords | **partial / privacy-first** |
+| Personal dictionary | Manual + auto-learn, cross-device sync | Manual dictionary, local only; no auto-learn or sync | **partial** |
+| Snippets | Voice shortcuts, shared on Teams | Local voice-trigger snippets | **done** |
+| History | Local + cloud history, retention controls | Local-only history with KEEP / 24 HOURS / NEVER and audio purge | **done** |
+| Undo | Correction flow | Notification undo restores the field only if unchanged | **done** |
+| Command Mode | Rewrite highlighted text with a spoken instruction | Hold bubble with text selected; local edits offline, cloud LLM for freeform rewrites | **done** |
+| Languages | 100+, auto-detect, Hinglish | 7 local languages + provider auto-detect; no Hinglish/Telugu locally | **gap (local breadth)** |
+| Streaming partials | gRPC stream with word alignments | Batch transcription; no partial words | **gap** |
+| Offline mode | None | Full offline dictation path | **done (and beyond)** |
+| Account / sync | Required account; cross-device sync | No account, no sync | **deliberate** |
+| Paywall / word caps | Free caps, Pro/Teams | Free, open source, no caps | **deliberate** |
+| Insertion | Accessibility + own IME fallback | Accessibility paste-first verify + own IME + clipboard fallback | **done** |
+| Password protection | Refuses password/card fields | Refuses password fields and its own fields | **done** |
+| Banking-app stand-down | Present | Not implemented | **gap** |
+| Per-app / web-editor shims | Present | Generic paste/`ACTION_SET_TEXT` fallbacks | **gap** |
+| Bubble size / opacity | Settings | Small / Normal / Large and 60 / 80 / 100% opacity | **done** |
+| Boot / service recovery | Watchdog, JobService, boot + unlock receivers | Boot receiver + persisted bubble intent; battery-optimization shortcut | **partial** |
+| Session limits | Warn ~4 min, stop ~5 min on Android | Warns at 4 min, auto-transcribes at 5 min | **done** |
+| Wake word | Reportedly Pro; unconfirmed on Android | Not implemented | **deliberate** |
+| Meeting notetaker | Present on some platforms | Not implemented | **deliberate** |
+| LinkedIn integration | Present in observed APK | Not applicable | **deliberate** |
+| Privacy controls | Cloud storage, model training, context toggles | Local-only, no telemetry, no screen capture, encrypted keys, retention | **done (and beyond)** |
 
-## Deliberate gaps (what we are NOT copying)
+## Gaps that remain and why
 
-1. **No cloud-dependent architecture.** Wispr Flow's entire pipeline requires connectivity; Wahtuh Pho's reason to exist is the opposite.
-2. **No account system.** Wispr Flow requires email/password sign-in before first use; the MVP needs no account.
-3. **No tone-adaptation-by-app surveillance.** Wispr Flow's Styles/Context Awareness reads on-screen text of the target app; we will not replicate screen-reading beyond what text insertion mechanically requires.
-4. **No word caps or tiers.** Parity here means matching the *user-facing capability* (dictation, cleanup, dictionary, history), not the business model.
+1. **Local language breadth.** Whistle covers seven languages. Cloud auto-detect
+   can cover more, but on-device Hinglish/Telugu needs a different model. We will
+   not fake language support.
+2. **Streaming partials.** Wispr's cloud stream shows words as they land. Our
+   local and cloud paths are batch. Streaming would require an incremental ASR
+   engine and an incremental insertion protocol with rollback.
+3. **Dictionary auto-learning and sync.** Auto-learn needs reliable correction
+   signals; sync needs an account, which is a deliberate non-goal.
+4. **Banking/web-editor shims.** Real-device coverage is required before adding
+   package-specific behavior; guessing risks breaking insertion.
+5. **Deep device verification.** The v0.3.0 build still needs a physical pass
+   for the newest features: Command Mode, retention, boot restore, and battery.
+
+## Deliberate non-goals
+
+- Cloud-only architecture, required accounts, subscriptions, word caps.
+- Broad screen capture or on-screen prose reading.
+- Wake word, meeting notetaker, LinkedIn integration in this Android app.
+
+## Bottom line
+
+Wahtuh Pho leads on ownership, offline operation, privacy, and inspectable
+cleanup. Wispr Flow still leads on local language breadth, streaming feedback,
+account sync, and per-app hardening. Everything else in the public Android
+feature set now has a first-class Wahtuh Pho equivalent, and the remaining gaps
+are documented rather than hidden.

@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#121014" />
-    <stroke android:width="1dp" android:color="@color/wp_line" />
-    <corners android:topLeftRadius="26dp" android:topRightRadius="26dp" />
-</shape>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/wp_line" />
+        </shape>
+    </item>
+    <item android:top="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/wp_bg2" />
+        </shape>
+    </item>
+</layer-list>

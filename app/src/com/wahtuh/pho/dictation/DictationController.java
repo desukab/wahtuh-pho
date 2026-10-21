@@ -17,17 +17,15 @@ import com.wahtuh.pho.data.HistoryEntry;
 import com.wahtuh.pho.data.HistoryStore;
 import com.wahtuh.pho.data.SecureStore;
 import com.wahtuh.pho.data.Settings;
+import com.wahtuh.pho.service.InsertAccessibilityService;
 import com.wahtuh.pho.text.Dictionary;
 import com.wahtuh.pho.text.ProcessedResult;
+import com.wahtuh.pho.text.Snippets;
 import com.wahtuh.pho.text.TextPipeline;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,6 +53,7 @@ public final class DictationController {
     private String state = IDLE;
     private int session;
     private boolean busy;
+    private String commandSource;
 
     private DictationController(Context context) {
         this.app = context.getApplicationContext();
@@ -78,6 +77,27 @@ public final class DictationController {
     }
 
     public void start(DictationListener l) {
+        startInternal(l, null);
+    }
+
+    public void startCommand(DictationListener l, String selectedText) {
+        startInternal(l, selectedText);
+    }
+
+    public boolean commandReady() {
+        Settings settings = new Settings(app);
+        String provider = settings.provider();
+        if (Settings.LOCAL.equals(provider)) return true;
+        if (settings.localOnly()) return false;
+        try {
+            String key = new SecureStore(app).get(settings.keyName(provider));
+            return key != null && !key.trim().isEmpty();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void startInternal(DictationListener l, String selectedText) {
         final int token;
         synchronized (lock) {
             if (busy) {
@@ -87,9 +107,10 @@ public final class DictationController {
             busy = true;
             token = ++session;
             listener = l;
+            commandSource = selectedText;
             state = PREPARING;
         }
-        emitState(PREPARING, "Preparing microphone");
+        emitState(PREPARING, "Getting ready");
         if (app.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             fail(token, "Microphone permission is not granted.");
@@ -107,7 +128,7 @@ public final class DictationController {
             try {
                 if (local) {
                     if (!AsrManager.get(app).modelsReady()) {
-                        emitState(PREPARING, "Unpacking on-device models (one time)");
+                        emitState(PREPARING, "Getting ready");
                         AsrManager.get(app).prepareModels();
                     }
                 }
@@ -149,6 +170,13 @@ public final class DictationController {
     public void stop() {
         final AudioCapture c;
         final int token;
+        Settings stopSettings = new Settings(app);
+        final String style = effectiveStyle(stopSettings);
+        final String context = stopSettings.fieldContext() && stopSettings.cleanup()
+                && !Settings.LOCAL.equals(stopSettings.provider())
+                ? TextPipeline.contextTerms(
+                        InsertAccessibilityService.focusedContext(1200), 40)
+                : "";
         synchronized (lock) {
             if (!busy) return;
             token = session;
@@ -158,13 +186,14 @@ public final class DictationController {
                 // Still preparing; cancel the pending session.
                 busy = false;
                 session++;
+                commandSource = null;
                 state = IDLE;
                 emitState(IDLE, "Cancelled");
                 return;
             }
             state = TRANSCRIBING;
         }
-        emitState(TRANSCRIBING, "Transcribing on device");
+        emitState(TRANSCRIBING, "Writing");
         io.execute(() -> {
             AudioCapture.Recording rec;
             try {
@@ -173,7 +202,7 @@ public final class DictationController {
                 main.post(() -> fail(token, "Recording failed: " + message(e)));
                 return;
             }
-            finish(token, rec);
+            finish(token, rec, style, context);
         });
     }
 
@@ -182,6 +211,7 @@ public final class DictationController {
         synchronized (lock) {
             session++;
             busy = false;
+            commandSource = null;
             state = IDLE;
             c = capture;
             capture = null;
@@ -190,37 +220,64 @@ public final class DictationController {
         emitState(IDLE, "Cancelled");
     }
 
-    private void finish(int token, AudioCapture.Recording rec) {
+    private void finish(int token, AudioCapture.Recording rec, String style, String context) {
         long started = System.currentTimeMillis();
+        String command;
+        synchronized (lock) {
+            command = commandSource;
+            commandSource = null;
+        }
         try {
-            float[] trimmed = SpeechAudio.trim(rec.samples, rec.sampleRate);
-            if (trimmed.length < rec.sampleRate / 4) {
+            SpeechAudio.Plan plan = SpeechAudio.analyze(rec.samples, rec.sampleRate);
+            if (!plan.hasSpeech()) {
                 main.post(() -> fail(token, "No speech detected."));
                 return;
             }
+            float[] prepared = SpeechAudio.prepare(rec.samples, rec.sampleRate);
+            if (prepared.length < rec.sampleRate / 6) {
+                main.post(() -> fail(token, "No speech detected."));
+                return;
+            }
+
             Settings settings = new Settings(app);
-            String raw;
-            String engine;
             String provider = settings.provider();
             String language = settings.language();
+            String detected = language;
+            String engine;
+            String raw;
 
-            if (Settings.LOCAL.equals(provider)) {
-                emitState(TRANSCRIBING, "Transcribing on device");
-                AsrOutput out = AsrManager.get(app).transcribe(trimmed, language, settings.engine());
-                raw = out.text;
-                engine = out.engine;
-                if (out.language != null && !out.language.isEmpty()
-                        && Settings.LANG_AUTO.equals(language)) {
-                    language = out.language;
+            boolean split = plan.shouldSplit(rec.durationMs) && plan.segments.size() > 1;
+            if (split) {
+                emitState(TRANSCRIBING, "Writing " + plan.segments.size() + " phrases");
+                StringBuilder merged = new StringBuilder();
+                engine = Settings.LOCAL.equals(provider) ? "whistle" : "cloud:" + provider;
+                for (SpeechAudio.Segment segment : plan.segments) {
+                    float[] piece = SpeechAudio.prepare(segment.samples, rec.sampleRate);
+                    if (piece.length < rec.sampleRate / 6) continue;
+                    EngineResult result = transcribeClip(settings, provider, piece,
+                            rec.sampleRate, language, detected);
+                    engine = result.engine;
+                    if (result.language != null && !result.language.isEmpty()) {
+                        detected = result.language;
+                    }
+                    String part = result.text == null ? "" : result.text.trim();
+                    if (part.isEmpty()) continue;
+                    if (merged.length() > 0) {
+                        merged.append(segment.pauseBeforeMs >= 1200 ? "\n\n" : " ");
+                    }
+                    merged.append(part);
                 }
+                raw = merged.toString();
             } else {
-                TranscriptionRouter.assertCloudAllowed(settings);
-                emitState(TRANSCRIBING, "Uploading to " + settings.providerLabel());
-                String key = new SecureStore(app).get(settings.keyName(provider));
-                String prompt = CloudTranscriber.vocabularyPrompt(settings.userDictionary());
-                raw = CloudTranscriber.transcribe(provider, key,
-                        Wav.fromFloat(trimmed, rec.sampleRate), settings.cloudLanguage(), prompt);
-                engine = "cloud:" + provider;
+                emitState(TRANSCRIBING, Settings.LOCAL.equals(provider)
+                        ? "Writing" : "Writing with " + settings.providerLabel());
+                EngineResult result = transcribeClip(settings, provider, prepared,
+                        rec.sampleRate, language, detected);
+                raw = result.text;
+                engine = result.engine;
+                if (result.language != null && !result.language.isEmpty()) {
+                    detected = result.language;
+                }
             }
 
             if (raw == null || raw.trim().isEmpty()) {
@@ -231,46 +288,82 @@ public final class DictationController {
             Dictionary dict = Dictionary.withUserEntries(Dictionary.load(app), settings.userDictionary());
             TextPipeline.Options opt = new TextPipeline.Options(
                     dict, settings.punctuation(), settings.fillers(), language);
+            opt.snippets = Snippets.parse(settings.snippets());
+            opt.style = style;
             ProcessedResult processed = new TextPipeline().process(raw, opt);
 
             String text = processed.text;
             boolean cleaned = false;
-            if (settings.cleanup() && !Settings.LOCAL.equals(provider)
-                    && !text.trim().isEmpty()) {
-                emitState(TRANSCRIBING, "Cleaning up text");
-                try {
-                    String key = new SecureStore(app).get(settings.keyName(provider));
-                    String clean = CloudTranscriber.cleanup(provider, key, text);
-                    if (clean != null && !clean.trim().isEmpty()) {
-                        text = clean.trim();
-                        cleaned = true;
+            if (command != null) {
+                emitState(TRANSCRIBING, "Applying command");
+                String offline = TextPipeline.selectionCommand(command, raw);
+                if (offline != null) {
+                    text = offline;
+                    cleaned = true;
+                    engine = "command:local";
+                } else {
+                    String[] target = cleanupTarget(settings, provider);
+                    if (target == null) {
+                        main.post(() -> fail(token, "Offline Command Mode supports case, "
+                                + "list, and delete commands; add a Groq, OpenAI, or "
+                                + "Gemini key for freeform rewrites"));
+                        return;
                     }
-                } catch (Throwable e) {
-                    // Cleanup is optional; keep the deterministic result and report it.
-                    emitState(TRANSCRIBING, "Cleanup failed, keeping local text");
+                    try {
+                        String rewritten = CloudTranscriber.command(
+                                target[0], target[1], command, raw, style);
+                        if (rewritten == null || rewritten.trim().isEmpty()) {
+                            main.post(() -> fail(token, "The command returned no text"));
+                            return;
+                        }
+                        text = rewritten.trim();
+                        cleaned = true;
+                        engine = "command:" + target[0];
+                    } catch (Throwable e) {
+                        main.post(() -> fail(token, "Command failed: " + message(e)));
+                        return;
+                    }
+                }
+            } else {
+                String[] target = settings.cleanup() && !Settings.LOCAL.equals(provider)
+                        && !text.trim().isEmpty() ? cleanupTarget(settings, provider) : null;
+                if (target != null) {
+                    emitState(TRANSCRIBING, "Polishing");
+                    try {
+                        String clean = CloudTranscriber.cleanup(
+                                target[0], target[1], text, style, context);
+                        if (clean != null && !clean.trim().isEmpty()) {
+                            text = clean.trim();
+                            cleaned = true;
+                        }
+                    } catch (Throwable ignored) {}
+                    if (!cleaned) emitState(TRANSCRIBING, "Writing");
                 }
             }
 
             long latency = System.currentTimeMillis() - started;
             String finalText = text;
             String finalLanguage = processed.language;
+            if (detected != null && !detected.isEmpty()
+                    && !Settings.LANG_AUTO.equals(detected)) {
+                finalLanguage = detected;
+            }
             String finalRaw = raw;
             String finalEngine = engine;
             String finalProvider = provider;
             boolean finalCleaned = cleaned;
+            boolean finalCommand = command != null;
             long duration = rec.durationMs;
 
             String id = UUID.randomUUID().toString();
-            String audioPath = settings.keepAudio()
-                    ? writeAudio(id, Wav.fromFloat(trimmed, rec.sampleRate)) : "";
-
             HistoryEntry entry = new HistoryEntry(id, System.currentTimeMillis(), raw, text,
                     engine, provider, finalLanguage, duration, latency, cleaned,
                     editsJson(processed));
             new HistoryStore(app).append(entry);
 
             DictationResult result = new DictationResult(finalRaw, finalText, processed.edits,
-                    finalLanguage, finalEngine, finalProvider, duration, latency, finalCleaned);
+                    finalLanguage, finalEngine, finalProvider, duration, latency, finalCleaned,
+                    finalCommand);
             synchronized (lock) {
                 if (token != session) return;
                 busy = false;
@@ -287,10 +380,68 @@ public final class DictationController {
         }
     }
 
+    private static final class EngineResult {
+        final String text;
+        final String engine;
+        final String language;
+
+        EngineResult(String text, String engine, String language) {
+            this.text = text;
+            this.engine = engine;
+            this.language = language;
+        }
+    }
+
+    private EngineResult transcribeClip(Settings settings, String provider, float[] pcm,
+            int sampleRate, String language, String detected) throws Exception {
+        if (Settings.LOCAL.equals(provider)) {
+            AsrOutput out = AsrManager.get(app).transcribe(pcm, language);
+            String next = detected;
+            if (out.language != null && !out.language.isEmpty()
+                    && Settings.LANG_AUTO.equals(language)) {
+                next = out.language;
+            }
+            return new EngineResult(out.text, out.engine, next);
+        }
+        TranscriptionRouter.assertCloudAllowed(settings);
+        String key = new SecureStore(app).get(settings.keyName(provider));
+        String prompt = CloudTranscriber.vocabularyPrompt(settings.userDictionary());
+        String text = CloudTranscriber.transcribe(provider, key,
+                Wav.fromFloat(pcm, sampleRate), settings.cloudLanguage(), prompt);
+        return new EngineResult(text, "cloud:" + provider, detected);
+    }
+
+    /**
+     * Transcription and cleanup can use different vendors. Deepgram has no
+     * general-purpose rewrite model, so use the first configured Groq, OpenAI
+     * or Gemini key for the text-only polish pass.
+     */
+    private String effectiveStyle(Settings settings) {
+        String style = settings.style();
+        if (!settings.appTone() || !Settings.STYLE_DEFAULT.equals(style)) return style;
+        return TextPipeline.styleForPackage(InsertAccessibilityService.focusedPackage());
+    }
+
+    private String[] cleanupTarget(Settings settings, String preferred) {
+        SecureStore store = new SecureStore(app);
+        String[] order = { preferred, Settings.GROQ, Settings.OPENAI, Settings.GEMINI };
+        for (String p : order) {
+            if (Settings.LOCAL.equals(p) || Settings.DEEPGRAM.equals(p)) continue;
+            if (!p.equals(preferred) && !Settings.DEEPGRAM.equals(preferred)) continue;
+            try {
+                String key = store.get(settings.keyName(p));
+                if (key != null && !key.trim().isEmpty()) return new String[] { p, key };
+            } catch (Throwable ignored) {}
+            if (p.equals(preferred)) break;
+        }
+        return null;
+    }
+
     private void fail(int token, String message) {
         synchronized (lock) {
             if (token != session) return;
             busy = false;
+            commandSource = null;
             state = ERROR;
         }
         DictationListener l;
@@ -303,17 +454,6 @@ public final class DictationController {
         DictationListener l;
         synchronized (lock) { l = listener; }
         if (l != null) main.post(() -> l.onState(s, message));
-    }
-
-    private String writeAudio(String id, byte[] wav) {
-        try {
-            File dir = new File(app.getFilesDir(), "audio");
-            dir.mkdirs();
-            File f = new File(dir, id + ".wav");
-            try (FileOutputStream out = new FileOutputStream(f)) { out.write(wav); }
-            return f.getAbsolutePath();
-        } catch (Exception ignored) {}
-        return "";
     }
 
     private static String editsJson(ProcessedResult r) {

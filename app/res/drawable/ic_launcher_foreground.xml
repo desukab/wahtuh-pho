@@ -1,19 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#7C5CFF"
-        android:pathData="M54,26a28,28 0,1 0,0 56a28,28 0,1 0,0 -56" />
-    <path
-        android:fillColor="#0B1020"
-        android:pathData="M54,38a16,16 0,1 0,0 32a16,16 0,1 0,0 -32" />
-    <path
-        android:fillColor="#33D6C0"
-        android:pathData="M51,36h6v36h-6z" />
-    <path
-        android:fillColor="#33D6C0"
-        android:pathData="M40,47h6v14h-6zM62,43h6v22h-6z" />
+    <!-- magenta drop shadow -->
+    <path android:fillColor="#FF4FAF"
+        android:pathData="M44,22h28v4h-28zM40,26h36v8h-36zM40,34h36v32h-36zM44,66h28v4h-28zM48,70h20v8h-20zM54,78h12v8h-12zM40,86h40v4h-40z" />
+    <!-- cyan sound bars -->
+    <path android:fillColor="#4DE8FF"
+        android:pathData="M22,40h6v12h-6zM28,46h4v4h-4zM30,36h4v4h-4zM80,34h4v16h-4zM84,40h4v8h-4zM76,46h4v4h-4z" />
+    <!-- lime microphone body -->
+    <path android:fillColor="#B7FF3C"
+        android:pathData="M44,18h20v4h-20zM40,22h28v4h-28zM36,26h36v8h-36zM36,34h36v28h-36zM40,62h28v4h-28zM44,66h20v4h-20zM50,70h8v8h-8zM36,82h36v4h-36zM42,78h24v4h-24z" />
+    <!-- dark pixel grille -->
+    <path android:fillColor="#08081A"
+        android:pathData="M44,32h20v4h-20zM44,40h20v4h-20zM44,48h20v4h-20z" />
+    <!-- cream stand and highlight -->
+    <path android:fillColor="#FFF4D6"
+        android:pathData="M38,84h32v4h-32zM48,24h4v4h-4zM42,76h24v4h-24z" />
+    <path android:fillColor="#4DE8FF"
+        android:pathData="M92,20h4v4h-4zM18,60h4v4h-4zM88,66h4v4h-4z" />
 </vector>

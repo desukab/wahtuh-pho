@@ -15,10 +15,17 @@ public final class DictationResult {
     public final long durationMs;
     public final long latencyMs;
     public final boolean cleaned;
+    public final boolean command;
 
     public DictationResult(String raw, String text, List<Edit> edits, String language,
                            String engine, String provider, long durationMs, long latencyMs,
                            boolean cleaned) {
+        this(raw, text, edits, language, engine, provider, durationMs, latencyMs, cleaned, false);
+    }
+
+    public DictationResult(String raw, String text, List<Edit> edits, String language,
+                           String engine, String provider, long durationMs, long latencyMs,
+                           boolean cleaned, boolean command) {
         this.raw = raw == null ? "" : raw;
         this.text = text == null ? "" : text;
         this.edits = Collections.unmodifiableList(edits);
@@ -28,6 +35,7 @@ public final class DictationResult {
         this.durationMs = durationMs;
         this.latencyMs = latencyMs;
         this.cleaned = cleaned;
+        this.command = command;
     }
 
     public boolean empty() { return text.trim().isEmpty(); }

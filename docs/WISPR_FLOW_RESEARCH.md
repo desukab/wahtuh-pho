@@ -268,3 +268,42 @@ Reviews / comparisons (third-party claims, attributed as such):
 - https://iseoai.com/wispr-flow/
 - https://www.sales-hacking.com/en/outils/wispr-flow
 - https://www.productcool.com/product/wispr-flow-for-android
+
+---
+
+## 14. Product takeaway for Wahtuh Pho
+
+### Why people pay for Flow
+
+The paid value is not raw transcription. It is the removal of the editing loop:
+
+1. **Zero-friction capture** — one bubble/hotkey, works in the field you are already in, no copy/paste or app switching.
+2. **Send-ready output** — punctuation, capitalization, filler removal, backtracking, lists, and names handled automatically.
+3. **Destination-aware tone** — formal in email, casual in chat, code-aware in editors (desktop/English only today).
+4. **Personal vocabulary and snippets** — the tool learns how you write and speak.
+5. **Reliability and speed** — the cloud model is consistently good and the interaction is polished.
+6. **A mental shortcut** — users stop thinking of it as “speech recognition” and start thinking of it as “typing, but faster.”
+
+### What we adopt
+
+- Bubble only when an editable field is focused and the keyboard is open, so it stops covering content when it is not useful.
+- VAD-driven capture: no-speech rejection, pre/post roll, pause segmentation, and a debounced start.
+- Deterministic cleanup that works offline: fillers, punctuation, dictionary, snippets, email dictation, styles.
+- Optional text-only AI polish, with the raw and cleaned result both preserved.
+- Fast correction paths: verified insertion, clipboard fallback, notification undo.
+- Personality and offline play: the arcade is a real product surface, not a settings page.
+
+### What we deliberately do not copy
+
+- Cloud-only transcription. Local-only is the default and cannot silently fall back.
+- Screen capture or broad on-screen context reading. Future app-aware tone must use only the foreground package name.
+- A mandatory account, subscription, or word quota.
+- A proprietary pipeline that hides what changed. Cleanup should be inspectable and reversible.
+
+### The defensible position
+
+**“The voice keyboard you own.”**
+
+Private by architecture, not by promise: on-device ASR, bring-your-own-key cloud, text-only cleanup, no screen capture, no account, no subscription. The arcade shell makes the privacy-first choice feel intentional and fun rather than like a compromise.
+
+**App-aware tone without screen capture** is now implemented: the app uses only the foreground package name to choose a tone preset (chat vs. email vs. notes), never the field contents. That captures part of Flow's context advantage while keeping the privacy story honest. An off-by-default **Field Context** switch can additionally extract names/code terms from the focused field for AI polish; it never sends surrounding prose and never reads passwords.

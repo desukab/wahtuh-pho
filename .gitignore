@@ -23,6 +23,7 @@ local.properties
 .gradle/
 *.apk
 *.aab
+/tmp/
 
 # Editor / OS noise
 .DS_Store

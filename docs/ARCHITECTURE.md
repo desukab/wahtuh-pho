@@ -240,41 +240,48 @@ trait. The deciding experiment before committing is specified in
 
 ---
 
-# Android app (v0.1.0, shipped)
+# Android app (v0.3.0)
 
 The shipped APK is a separate, Gradle-free Android implementation. It does not link the Rust crates.
 
 ## Runtime flow
 
 ```
-mic / WAV
+mic
   └─ AudioCapture (16 kHz mono float)
-      └─ SpeechAudio.trim + utterances (silence split)
+      └─ SpeechAudio.trim
           └─ DictationController
-              ├─ AsrManager (local)
-              │   ├─ WhisperEngine (sherpa-onnx OfflineRecognizer)
-              │   ├─ VoskEngine (Vosk Recognizer)
-              │   └─ HybridEngine (Whisper language detect → Vosk for Telugu)
+              ├─ AsrManager → WhistleEngine (JNI → libneedle.a)
               ├─ TranscriptionRouter (local-only chokepoint)
-              │   └─ CloudTranscriber (Groq / OpenAI / Gemini)
-              ├─ TextPipeline (punctuation, fillers, dictionary)
+              │   └─ CloudTranscriber (Groq / Gemini / Deepgram / OpenAI)
+              ├─ TextPipeline (punctuation, fillers, dictionary, snippets, style)
               ├─ HistoryStore (JSONL, raw + final + edits)
-              └─ DictationResult → listener (MainActivity, IME, bubble)
+              └─ DictationResult → listener (activity, IME, bubble)
 ```
 
 ## Components
 
 | Path | Responsibility |
 |---|---|
-| `app/src/com/wahtuh/pho/asr/` | Model install, Whisper, Vosk, hybrid routing, `AsrManager` |
+| `app/src/com/wahtuh/pho/asr/` | Whistle model install, JNI engine, `AsrManager` |
 | `app/src/com/wahtuh/pho/audio/` | `AudioCapture` (AudioRecord) and `Wav` read/write |
 | `app/src/com/wahtuh/pho/speech/` | VAD/trim/utterance splitting over RMS frames |
 | `app/src/com/wahtuh/pho/dictation/` | Session state machine and listener contract |
 | `app/src/com/wahtuh/pho/cloud/` | Multipart/JSON clients and privacy router |
-| `app/src/com/wahtuh/pho/text/` | Deterministic pipeline, dictionary, edits, WER/CER |
+| `app/src/com/wahtuh/pho/text/` | Deterministic pipeline, dictionary, snippets, edits, WER/CER |
 | `app/src/com/wahtuh/pho/data/` | Preferences, Keystore keys, JSONL history |
 | `app/src/com/wahtuh/pho/service/` | IME keyboard, bubble FGS, accessibility insertion |
-| `app/src/com/wahtuh/pho/diag/` | Self-tests, benchmarks, mic smoke test |
+| `app/src/com/wahtuh/pho/ui/` | Arcade palette, pixel type, bevel/panel drawing, backdrop |
+
+## Whistle JNI
+
+`native/whistle_jni.cpp` exposes three methods to `WhistleEngine`:
+
+- `nativeLoad(modelPath)` reads the `.cact` bytes and calls `needle_load`.
+- `nativeTranscribe(pcm, language, keywords)` calls `needle_transcribe` with 16 kHz float PCM and returns its JSON.
+- `nativeError()` returns `needle_last_error()`.
+
+The library links `libneedle.a` and bundles `libc++_shared.so`. Model loading is process-global and guarded by a Java monitor. Language is `en`, `de`, `fr`, `es`, `it`, `nl`, `pl`, or `null` for auto-detect. User-dictionary keys are passed as newline-separated keyword hints.
 
 ## Android state machine
 
@@ -282,11 +289,11 @@ mic / WAV
 
 ## Android build
 
-`scripts/build.sh` extracts AAR classes/JNI, runs `aapt2` with bundled assets, compiles with `javac`, jars app classes, converts with D8 (`--release --min-api 26 --lib android.jar`), adds `classes.dex` + `lib/arm64-v8a`, zipaligns, signs, and verifies. Legacy `dx` is not used because it lacks lambda desugaring.
+`scripts/build.sh` copies JNI libraries, compiles resources with `aapt2`, compiles Java with `javac`, converts with D8 (`--release --min-api 26 --lib android.jar`), packages `classes.dex` and `lib/arm64-v8a`, zipaligns, signs, and verifies. Legacy `dx` is not used because it lacks lambda desugaring. No Gradle or Kotlin dependencies remain.
 
 ## Android storage
 
-- `files/models/` — unpacked models with a version marker
+- `files/models/` — unpacked Whistle model with a version marker
 - `files/history.jsonl` — append-only JSONL, max 300 entries
 - `files/audio/` — optional per-dictation WAVs
 - `shared_prefs/` — settings; API key ciphertext only, with the key in Keystore

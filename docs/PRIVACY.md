@@ -1,8 +1,7 @@
 # Wahtuh Pho — Privacy
 
-**Date:** 2026-10-19 · **Status:** describes the design as implemented in the
-Rust core; the Android app does not exist yet, so platform-layer behaviors
-are marked *design*.
+**Date:** 2026-10-22 · **Status:** the first half describes the Rust core
+design; the Android section at the end describes the shipped v0.3.0 app.
 
 **One line:** in the default mode, your voice never leaves your device and
 the project collects nothing. Cloud transcription exists only as an explicit
@@ -88,9 +87,10 @@ names verified against official docs 2026-10-19; see
 
 | Provider | What leaves the device | Their terms |
 |---|---|---|
-| Groq | Audio chunks + transcript request (`api.groq.com`) | Groq privacy policy / API terms |
-| OpenAI | Audio chunks + transcript request (`api.openai.com`) | OpenAI API data-usage policy |
-| Gemini | Audio chunks (inline data) + prompt (`generativelanguage.googleapis.com`) | Google API data practices |
+| Groq | Audio + transcript request (`api.groq.com`) | Groq privacy policy / API terms |
+| OpenAI | Audio + transcript request (`api.openai.com`) | OpenAI API data-usage policy |
+| Gemini | Audio (inline data) + transcription config (`generativelanguage.googleapis.com`) | Google API data practices |
+| Deepgram | Audio + transcript request (`api.deepgram.com`) | Deepgram privacy policy / API terms |
 
 Optional AI cleanup/post-processing (punctuation restoration, reformatting) is
 a **separate opt-in step**, never applied silently. Local transcription
@@ -103,7 +103,9 @@ itself involves **zero third parties**.
 | `RECORD_AUDIO` | Required to capture dictation from the microphone. Without it, there is no product. |
 | `FOREGROUND_SERVICE_MICROPHONE` (or equivalent) | Dictation sessions run as a foreground service so recording isn't killed; the persistent notification tells you when the mic is live. |
 | `POST_NOTIFICATIONS` | Session status / the foreground-service notification channel. |
-| `BIND_ACCESSIBILITY_SERVICE` *(future)* | Text insertion into other apps via Accessibility, matching the Wispr Flow approach — only to deliver the transcript you dictated; no screen-reading beyond insertion mechanics. |
+| `BIND_ACCESSIBILITY_SERVICE` | Text insertion into other apps and bubble visibility. The service checks whether the focused field is editable and not a password field; it reads field text at insertion, at the start of Command Mode, or when opt-in Field Context is enabled, and never reads password fields. No screen capture and no background reading. |
+| `RECEIVE_BOOT_COMPLETED` | Restores the floating bubble after reboot only if you had deliberately started it. |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Opens the system exemption prompt so Android does not kill a long dictation. The app never enables the exemption without your confirmation. |
 
 No contacts, location, camera, or storage permissions are part of the design.
 Recording is push-to-talk / session-scoped: the mic is not hot when you
@@ -125,9 +127,9 @@ The shipped app defaults to **On-device (private)** with local-only mode **on**.
 
 ## Stays on device
 
-- Microphone audio and both raw and cleaned transcripts.
-- `files/history.jsonl`, capped at 300 entries.
-- Optional WAVs in `files/audio/<id>.wav` when **Save each recording** is enabled.
+- Microphone audio and both raw and cleaned transcripts. Local ASR is Cactus Whistle; no audio leaves the device in on-device mode.
+- `files/history.jsonl`, capped at 300 entries and subject to the KEEP / 24 HOURS / NEVER policy.
+- No new audio files are written. Any legacy `files/audio/<id>.wav` files are deleted by Clear, by NEVER, and by the 24-hour policy.
 - Dictionary text, text settings, and provider choice.
 - API keys encrypted with an AES/GCM key in the Android Keystore.
 
@@ -140,12 +142,27 @@ Only when you pick a cloud provider **and** turn local-only off:
 | Groq | `api.groq.com` transcription | final text only |
 | OpenAI | `api.openai.com` transcription | final text only |
 | Gemini | `generativelanguage.googleapis.com` | final text only |
+| Deepgram | `api.deepgram.com` transcription | final text only, routed to your configured Groq/OpenAI/Gemini key; no cleanup if none is configured |
 
-Requests include audio, model, language hint, and a short vocabulary prompt from your user dictionary. No silent fallback: local-only is enforced in `TranscriptionRouter` before any network call.
+When **Command Mode** is used, local case/list/delete edits stay on device.
+Freeform rewrites send the selected text and your spoken instruction to the
+configured Groq, OpenAI, or Gemini key. The selected text is untrusted content
+and is not sent anywhere unless you hold the bubble with a selection, Command
+Mode is on, and the instruction is not one of the local commands.
+
+If **Field Context** is enabled (off by default), AI polish also receives a
+short list of names/code-like terms extracted from the focused field. The
+app does not send the surrounding sentences, never reads password fields,
+and never reads its own fields.
+
+Requests include audio, model, language hint, and short vocabulary hints from your user dictionary. No silent fallback: local-only is enforced in `TranscriptionRouter` before any network call.
 
 ## Controls
 
-- **Clear transcript history** deletes `history.jsonl`, not WAV files.
-- Recordings can be deleted by clearing app storage or uninstalling.
+- **App-aware tone** reads the foreground package name only (for example, a chat or email app) to pick a punctuation preset. It never reads the field contents or screen.
+- **Field Context** is a separate, off-by-default switch. When enabled, the app reads the focused field at stop time and sends only extracted names/code terms to AI polish. It is blocked unless AI polish is on, and refuses passwords and Wahtuh Pho's own fields.
+- **History retention** is KEEP, 24 HOURS, or NEVER. NEVER deletes `history.jsonl` and legacy audio and stops saving new entries.
+- **Clear transcript history** deletes `history.jsonl` and any legacy audio files.
+- Recordings are not saved by default; clearing app storage or uninstalling removes all local data.
 - Remove the cloud key at any time; transcripts remain.
 - No analytics, ads, crash reporting, or telemetry SDKs. `INTERNET` exists only for opt-in cloud calls.

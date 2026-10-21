@@ -249,11 +249,12 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
         if (result == null || result.text.isEmpty()) return;
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
-            ic.commitText(result.text, 1);
+            CharSequence before = ic.getTextBeforeCursor(1, 0);
+            boolean needsSpace = before != null && before.length() > 0
+                    && Character.isLetterOrDigit(before.charAt(0));
+            ic.commitText((needsSpace ? " " : "") + result.text, 1);
             if (preview != null) preview.setText(result.text);
-            if (status != null) {
-                status.setText(result.engine + " · " + result.latencyMs + " ms");
-            }
+            if (status != null) status.setText("Inserted");
         } else {
             ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", result.text));
