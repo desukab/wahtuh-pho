@@ -1,11 +1,40 @@
+# Rust build output
+/target/
+**/target/
+
+# Cargo leftovers
+*.rs.bk
+.cargo/
+
+# Environment / secrets - NEVER commit API keys
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+*keystore*
+
+# Android build output
 build/
 vendor/
 app/assets/models/
-*.jks
-*.keystore
 local.properties
-.idea/
 .gradle/
-tmp/
 *.apk
 *.aab
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Evaluation outputs (weights, corpora, runs) stay local
+eval/weights/
+eval/corpus/
+eval/runs/
+*.bin
+*.onnx
+*.pt

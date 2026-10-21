@@ -1,0 +1,250 @@
+[
+  {
+    "id": "jfk",
+    "file": "jfk.wav",
+    "lang": "en",
+    "reference": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+    "license": "whisper.cpp project sample (public-domain speech excerpt)",
+    "source_url": "https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/samples/jfk.wav"
+  },
+  {
+    "id": "te_fleurs_1",
+    "file": "te_fleurs_1.wav",
+    "lang": "te",
+    "reference": "అదే విధంగా షెంగెన్ వీసా ఉంటే మీరు షెంగెన్లో ఉండే ప్రతి దేశానికి వేరుగా వీసాను అప్లై చేయనవసరం లేదు దీని వలన సమయం డబ్బు మరియు కాగితాలను ఆదా చేయవచ్చు",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_2",
+    "file": "te_fleurs_2.wav",
+    "lang": "te",
+    "reference": "మొరాకో అంతటిలో షాపింగ్ చేయడానికి అత్యంత తక్కువ ఆసక్తికర ప్రదేశాలలో casablanca ఒకటి",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_3",
+    "file": "te_fleurs_3.wav",
+    "lang": "te",
+    "reference": "బాగా గుండ్రంగా ఉండే అథ్లెట్ పులి ఎక్కగలదు బాగా లేకపోయినా ఈదడం ఎక్కువ దూరం దూకడం మరియు బలమైన మనిషి యొక్క శక్తితో ఐదు రెట్లు లాగడం",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_4",
+    "file": "te_fleurs_4.wav",
+    "lang": "te",
+    "reference": "ఉత్తరానికి సులభంగా చేరుకొనే దినాన రొమాంటిక్ మనోహరమైన పట్టణం సింత్రా పట్టణం ఉంది మరియు లార్డ్ బైరాన్ ద్వారా నమోదు చేయబడిన దాని వైభవాల గురించి ఒక ప్రకాశవంతమైన కథనం తరువాత విదేశీయులకు ఇది ప్రసిద్ధి చెందింది",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_5",
+    "file": "te_fleurs_5.wav",
+    "lang": "te",
+    "reference": "చేసిన పని ఎక్కువగా సిద్ధాంతంగానే ఉంది కాని ధనుస్సు గెలాక్సీ చేసిన పరిశీలనలను ఉన్నటుగా భావించడానికి ఈ కార్యక్రమం వ్రాయబడింది",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_6",
+    "file": "te_fleurs_6.wav",
+    "lang": "te",
+    "reference": "దురదృష్టవశాత్తు ట్రాఫిక్ ప్రవాహాన్ని అధ్యయనం చేయడం కష్టం ఎందుకంటే డ్రైవర్ ప్రవర్తనను 1 వంద శాతం నిశ్చయంగా ఊహించలేము",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_7",
+    "file": "te_fleurs_7.wav",
+    "lang": "te",
+    "reference": "ఎత్తైన అక్షాంశాల వద్ద లేదా పర్వత మార్గాలలో ప్రయాణించే ఎవరైనా హిమపాతము మంచు లేదా గడ్డకట్టించే ఉష్ణోగ్రత గురించి అలోచించి తమ ప్రయాణానాలను ప్లాన్ చేసుకోవాలి",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_8",
+    "file": "te_fleurs_8.wav",
+    "lang": "te",
+    "reference": "దుస్తులు చాలా వేడిగా మారకుండా జాగ్రత్తగా ఉండండి ఇది సంకోచానికి కారణమవుతుంది లేదా తీవ్రమైన సందర్భాలలో కాలిపోయే అవకాశం ఉంది",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_9",
+    "file": "te_fleurs_9.wav",
+    "lang": "te",
+    "reference": "క్రస్ట్ ఉపరితల పోర కేంద్రానికి సమీపంలో 70 km మందం మరియు కేంద్రానికి దూరంగా 100 km మందం ఉంటుంది",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_10",
+    "file": "te_fleurs_10.wav",
+    "lang": "te",
+    "reference": "వన్యప్రాణుల విషయానికి వస్తే మదగాస్కర్ ఇప్పటివరకు దానికదే అతి పెద్ద ఖండంగా ఉంది",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_11",
+    "file": "te_fleurs_11.wav",
+    "lang": "te",
+    "reference": "1990 లో ఎడారి ఇసుక ముప్పు కారణంగా ప్రమాదంలో ఉన్న ప్రపంచ వారసత్వ ప్రదేశాల జాబితాలో ఇది కూడా చేర్చబడింది",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_12",
+    "file": "te_fleurs_12.wav",
+    "lang": "te",
+    "reference": "లగ్జరీ యొక్క కేంద్రంగా పేరుగాంచిన దాని పేరు సుమారు 400 ఏ.డి లో ప్రారంభమైంది మరియు సుమారు 1100 ఏ.డి వరకు కొనసాగింది",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_13",
+    "file": "te_fleurs_13.wav",
+    "lang": "te",
+    "reference": "జపాన్ అణు సంస్థ తెలిపిన వివరాల ప్రకారం ఈ ప్లాంట్ లో రేడియోయాక్టివ్ సీసియం అయోడిన్ లను గుర్తించారు",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_14",
+    "file": "te_fleurs_14.wav",
+    "lang": "te",
+    "reference": "తన కారుపై నియంత్రణ కోల్పోవడంతో జియాన్కార్లో ఫిసిచెల్లా రేసు ప్రారంభమైన వెంటనే ముగించాడు",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "te_fleurs_15",
+    "file": "te_fleurs_15.wav",
+    "lang": "te",
+    "reference": "అదే విధమైన హైకింగ్ రూట్ వలే స్కీయింగ్ రూట్ గురించి ఆలోచించండి",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_1",
+    "file": "en_fleurs_1.wav",
+    "lang": "en",
+    "reference": "unfortunately studying traffic flow is difficult because driver behavior cannot be predicted with one-hundred percent certainty",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_2",
+    "file": "en_fleurs_2.wav",
+    "lang": "en",
+    "reference": "its long jaws were studded with more than 70 razor-sharp teeth along with an extra set in the roof of its mouth meaning that there was no escape for anything that crossed its path",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_3",
+    "file": "en_fleurs_3.wav",
+    "lang": "en",
+    "reference": "in the archipelagos and lakes you do not necessarily need a yacht",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_4",
+    "file": "en_fleurs_4.wav",
+    "lang": "en",
+    "reference": "accepted were aristotle's views on all matters of science including psychology",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_5",
+    "file": "en_fleurs_5.wav",
+    "lang": "en",
+    "reference": "scotturb bus 403 travels regularly to sintra stopping at cabo da roca",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_6",
+    "file": "en_fleurs_6.wav",
+    "lang": "en",
+    "reference": "be careful not to allow fabric to become too hot which can cause shrinkage or in extreme cases scorch",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_7",
+    "file": "en_fleurs_7.wav",
+    "lang": "en",
+    "reference": "the document according to the leak will refer to the borders dispute which palestine wants based on the borders before the 1967 mideast war",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_8",
+    "file": "en_fleurs_8.wav",
+    "lang": "en",
+    "reference": "the 25 dunlap broadsides still known to exist are the oldest surviving copies of the document the original handwritten copy has not survived",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_9",
+    "file": "en_fleurs_9.wav",
+    "lang": "en",
+    "reference": "the vertical clearance under the bridge is 15 meters construction was completed in august 2011 it didn't open to traffic until march 2017",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_10",
+    "file": "en_fleurs_10.wav",
+    "lang": "en",
+    "reference": "they usually have special food drink and entertainment offers to keep guests in a good mood and keep them at the premise",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_11",
+    "file": "en_fleurs_11.wav",
+    "lang": "en",
+    "reference": "the satellite was sent into space by a rocket scientists use telescopes in space because the earth's atmosphere distorts some of our light and view",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_12",
+    "file": "en_fleurs_12.wav",
+    "lang": "en",
+    "reference": "built by the egyptians in the third century bce the great pyramid is one of many large pyramid structures built to honor dead pharaoh",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_13",
+    "file": "en_fleurs_13.wav",
+    "lang": "en",
+    "reference": "many people don't think about them as dinosaurs because they have feathers and can fly",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_14",
+    "file": "en_fleurs_14.wav",
+    "lang": "en",
+    "reference": "the giza plateau or giza necropolis in the egyptian valley of the dead contains several pyramids of which the great pyramid is the largest several small tombs several temples and the great sphinx",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  },
+  {
+    "id": "en_fleurs_15",
+    "file": "en_fleurs_15.wav",
+    "lang": "en",
+    "reference": "on some routes the larger companies have their own planes but for other routes and smaller firms there was a problem",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs"
+  }
+]

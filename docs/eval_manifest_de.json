@@ -1,0 +1,152 @@
+[
+  {
+    "id": "de_fleurs_1",
+    "file": "de_fleurs_1.wav",
+    "lang": "de",
+    "reference": "für die besten aussichten auf hongkong sollten sie die insel verlassen und zum gegenüberliegenden ufer von kowloon fahren",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 17.9,
+    "src_file": "10004059102127011984.wav"
+  },
+  {
+    "id": "de_fleurs_2",
+    "file": "de_fleurs_2.wav",
+    "lang": "de",
+    "reference": "er griff auch alles an was ins wasser kam selbst ein großer dinosaurier wie der t rex war ihm nicht gewachsen",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 11.2,
+    "src_file": "10009182821551087671.wav"
+  },
+  {
+    "id": "de_fleurs_3",
+    "file": "de_fleurs_3.wav",
+    "lang": "de",
+    "reference": "wenn sie den film das vermächtnis der tempelritter gesehen haben denken sie vielleicht dass auf die rückseite der unabhängigkeitserklärung eine schatzkarte gezeichnet wurde",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 12.4,
+    "src_file": "10014044777125235464.wav"
+  },
+  {
+    "id": "de_fleurs_4",
+    "file": "de_fleurs_4.wav",
+    "lang": "de",
+    "reference": "es leben noch viele männer und frauen die ihre zeit hier überlebt haben und viele weitere mit angehörigen die dort ermordet wurden oder sich zu tode arbeiteten juden und nichtjuden gleichermaßen",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 10.7,
+    "src_file": "10030056357041867775.wav"
+  },
+  {
+    "id": "de_fleurs_5",
+    "file": "de_fleurs_5.wav",
+    "lang": "de",
+    "reference": "die höhle befindet sich auf der spitze eines der berge nördlich von mekka und ist vom rest der welt völlig isoliert",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 9.9,
+    "src_file": "10058186628567796965.wav"
+  },
+  {
+    "id": "de_fleurs_6",
+    "file": "de_fleurs_6.wav",
+    "lang": "de",
+    "reference": "dieses sediment war nötig um sandbänke und strände zu bilden die als lebensräume für wildtiere dienten",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 8.4,
+    "src_file": "10058299886985225661.wav"
+  },
+  {
+    "id": "de_fleurs_7",
+    "file": "de_fleurs_7.wav",
+    "lang": "de",
+    "reference": "blogs können auch dazu beitragen die schreibfertigkeiten von schülern zu verbessern zwar haben schüler am anfang ihrer blogerfahrung oft eine schlampige grammatik und rechtschreibung aber das ändert sich normalerweise wenn es ein publikum gibt",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 13.0,
+    "src_file": "10095057775426831514.wav"
+  },
+  {
+    "id": "de_fleurs_8",
+    "file": "de_fleurs_8.wav",
+    "lang": "de",
+    "reference": "nachdem der damm 1963 erbaut worden war kamen die jahreszeitlichen überflutungen die sedimente im fluss verteilen zum stillstand",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 19.7,
+    "src_file": "10159541282515887574.wav"
+  },
+  {
+    "id": "de_fleurs_9",
+    "file": "de_fleurs_9.wav",
+    "lang": "de",
+    "reference": "insbesondere wird behauptet dass man erkennen kann ob jemand lügt indem man minimale veränderungen des gesichtsausdrucks richtig deutet.x",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 11.0,
+    "src_file": "10166547362714956625.wav"
+  },
+  {
+    "id": "de_fleurs_10",
+    "file": "de_fleurs_10.wav",
+    "lang": "de",
+    "reference": "die angemessene nutzung von blogs kann schülerinnen und schüler befähigen analytischer und kritischer zu werden; durch die aktive reaktion auf internetmaterialien können die schülerinnen und schüler ihre positionen im kontext der texte anderer definieren und ihre eigenen perspektiven zu bestimmten themen darlegen  oravec 2002",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 43.4,
+    "src_file": "10171859810965764480.wav"
+  },
+  {
+    "id": "de_fleurs_11",
+    "file": "de_fleurs_11.wav",
+    "lang": "de",
+    "reference": "jeder nimmt an der gesellschaft teil und benutzt transportsysteme. fast jeder beklagt sich über die transportsysteme.x",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 7.1,
+    "src_file": "10229344228128634115.wav"
+  },
+  {
+    "id": "de_fleurs_12",
+    "file": "de_fleurs_12.wav",
+    "lang": "de",
+    "reference": "nextgen ist ein system von dem die faa behauptet dass es flugzeugen erlauben würde kürzere strecken zu fliegen und jedes jahr millionen gallonen an treibstoff zu sparen und die kohlenstoffemissionen zu reduzieren",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 16.9,
+    "src_file": "10240730312646485406.wav"
+  },
+  {
+    "id": "de_fleurs_13",
+    "file": "de_fleurs_13.wav",
+    "lang": "de",
+    "reference": "ottawa ist kanadas bezaubernde zweisprachige hauptstadt und zeichnet sich durch eine reihe von kunstgalerien und museen aus die kanadas vergangenheit und gegenwart präsentieren",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 14.9,
+    "src_file": "10243976286554101786.wav"
+  },
+  {
+    "id": "de_fleurs_14",
+    "file": "de_fleurs_14.wav",
+    "lang": "de",
+    "reference": "in seinem artikel die rede des präsidenten zeigte oliver sacks auf wie leute die wegen eines hirnschadens keine sprache mehr verstehen können trotzdem die ehrlichkeit von menschen richtig einschätzen können",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 16.0,
+    "src_file": "10271188615398617841.wav"
+  },
+  {
+    "id": "de_fleurs_15",
+    "file": "de_fleurs_15.wav",
+    "lang": "de",
+    "reference": "seine langen kiefer waren mit mehr als 70 messerscharfen zähnen ausgestattet zuzüglich eines weiteren satzes am gaumen was bedeutete dass es kein entkommen für irgendein tier gab das seinen weg kreuzte",
+    "license": "CC-BY-4.0 (Google FLEURS)",
+    "source_url": "https://huggingface.co/datasets/google/fleurs",
+    "audio_sec": 11.0,
+    "src_file": "10287357790080034783.wav"
+  }
+]
