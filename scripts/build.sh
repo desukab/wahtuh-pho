@@ -70,6 +70,7 @@ ALIAS="${WAHTUH_KEY_ALIAS:-wahtuh}"
 STORE_PASS="${WAHTUH_STORE_PASS:-wahtuhdebug}"
 KEY_PASS="${WAHTUH_KEY_PASS:-$STORE_PASS}"
 if [ ! -f "$KEYSTORE" ]; then
+  mkdir -p "$(dirname "$KEYSTORE")"
   echo "    creating keystore $KEYSTORE (debug signing key; use WAHTUH_KEYSTORE for releases)"
   keytool -genkeypair -keystore "$KEYSTORE" -alias "$ALIAS" \
     -keyalg RSA -keysize 4096 -validity 10000 \
