@@ -46,3 +46,12 @@
 ## Commitment
 
 WER ≤ 1% is an optimization target, not a guarantee. A system can score well on read benchmark speech and still fail real Telugu dictation; held-out speakers and natural code-switching are essential.
+
+
+## Koyal model reality check (public model card, 2026-10-21)
+
+The Koyal Telugu 120M checkpoint is a credible candidate, but it does **not** imply 1% WER. Its published results distinguish metrics and corpora: FLEURS-RO reports 17.81% WER_SCRIBE, 24.49% plain WER, and 10.63% lexical error; across the six public verbatim benchmarks the reported macro ER_LEX is 15.81%. These are vendor-published results, not Wahtuh Pho measurements, and cannot be compared blindly to our existing normalized WER.
+
+The model card describes a ~120M NeMo/PyTorch Conformer hybrid TDT-CTC checkpoint (~0.5 GB), 16 kHz mono input, and says it is not trained for code-switching. The model files require accepting the Hugging Face access conditions. The checkpoint is not automatically a sherpa-onnx model. Before implementation, we must validate export compatibility and output equivalence, then benchmark the exported model on the same corpus and an independent Tenglish set. If unsupported by sherpa-onnx, use a separate native runtime or keep it server-side; do not mislabel the runtime.
+
+Source: https://huggingface.co/adalat-ai/koyal-te-120m-1.0 (model card and evaluation tables).
