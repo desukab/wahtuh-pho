@@ -1,7 +1,7 @@
 # Wahtuh Pho — Privacy
 
 **Date:** 2026-10-22 · **Status:** the first half describes the Rust core
-design; the Android section at the end describes the shipped v0.3.0 app.
+design; the Android section at the end describes the shipped v0.3.1 app.
 
 **One line:** in the default mode, your voice never leaves your device and
 the project collects nothing. Cloud transcription exists only as an explicit

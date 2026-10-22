@@ -10,7 +10,7 @@ structure. No code, assets, or copy were taken.
 
 ## Current matrix
 
-| Capability | Wispr Flow (public/observed) | Wahtuh Pho 0.3.0 | Status |
+| Capability | Wispr Flow (public/observed) | Wahtuh Pho 0.3.1 | Status |
 |---|---|---|---|
 | On-device transcription | Never. Cloud only. | Whistle 16.9 MB CPU model, offline by default, cannot silently fall back | **done (and beyond)** |
 | Cloud transcription | Proprietary cloud only | Groq, OpenAI, Gemini, Deepgram with user keys, opt-in | **done** |
@@ -37,6 +37,7 @@ structure. No code, assets, or copy were taken.
 | Account / sync | Required account; cross-device sync | No account, no sync | **deliberate** |
 | Paywall / word caps | Free caps, Pro/Teams | Free, open source, no caps | **deliberate** |
 | Insertion | Accessibility + own IME fallback | Accessibility paste-first verify + own IME + clipboard fallback | **done** |
+| Field character limits | Not documented | Fits text to the field limit; leftover words copied and shown in a notification | **done** |
 | Password protection | Refuses password/card fields | Refuses password fields and its own fields | **done** |
 | Banking-app stand-down | Present | Not implemented | **gap** |
 | Per-app / web-editor shims | Present | Generic paste/`ACTION_SET_TEXT` fallbacks | **gap** |
@@ -60,8 +61,9 @@ structure. No code, assets, or copy were taken.
    signals; sync needs an account, which is a deliberate non-goal.
 4. **Banking/web-editor shims.** Real-device coverage is required before adding
    package-specific behavior; guessing risks breaking insertion.
-5. **Deep device verification.** The v0.3.0 build still needs a physical pass
-   for the newest features: Command Mode, retention, boot restore, and battery.
+5. **Deep device verification.** The v0.3.1 build still needs a physical pass
+   for the newest features: Command Mode, retention, boot restore, battery, and
+   character-limit overflow reporting.
 
 ## Deliberate non-goals
 

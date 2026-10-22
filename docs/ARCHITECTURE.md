@@ -240,7 +240,7 @@ trait. The deciding experiment before committing is specified in
 
 ---
 
-# Android app (v0.3.0)
+# Android app (v0.3.1)
 
 The shipped APK is a separate, Gradle-free Android implementation. It does not link the Rust crates.
 

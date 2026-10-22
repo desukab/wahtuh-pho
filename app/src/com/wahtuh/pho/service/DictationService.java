@@ -58,6 +58,7 @@ public final class DictationService extends Service implements DictationListener
 
     private static final String CHANNEL = "wahtuh_dictation";
     private static final int NOTICE = 41;
+    private static final int OVERFLOW_NOTICE = 42;
     public static volatile boolean running;
     private static volatile DictationService instance;
 
@@ -698,6 +699,28 @@ public final class DictationService extends Service implements DictationListener
         setBubble(CREAM, "");
     }
 
+    private void showOverflow(String overflow) {
+        try {
+            ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", overflow));
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            Intent open = new Intent(this, MainActivity.class);
+            PendingIntent pi = PendingIntent.getActivity(this, 0, open,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                    ? new Notification.Builder(this, CHANNEL)
+                    : new Notification.Builder(this);
+            b.setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                    .setContentTitle(overflow.length() + " characters didn't fit")
+                    .setContentText("The rest is on your clipboard")
+                    .setStyle(new Notification.BigTextStyle().bigText(overflow))
+                    .setAutoCancel(true)
+                    .setContentIntent(pi);
+            nm.notify(OVERFLOW_NOTICE, b.build());
+        } catch (Exception ignored) {}
+    }
+
     private void updateNotification(String title, String text) {
         try {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -724,12 +747,14 @@ public final class DictationService extends Service implements DictationListener
             io.execute(() -> {
                 InsertAccessibilityService svc = InsertAccessibilityService.get();
                 String outcome;
+                String overflow = "";
                 boolean replaced = false;
                 if (svc != null) {
                     InsertAccessibilityService.Result r =
                             svc.replaceSelection(expected, result.text);
                     replaced = r.ok;
                     outcome = r.message;
+                    overflow = r.overflow;
                 } else {
                     outcome = "Accessibility service is off";
                 }
@@ -739,11 +764,18 @@ public final class DictationService extends Service implements DictationListener
                         cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", result.text));
                     }
                     outcome = outcome + " — text copied";
+                    overflow = "";
+                } else if (!overflow.isEmpty()) {
+                    showOverflow(overflow);
                 }
+                final String missing = overflow;
+                final String extra = missing.isEmpty() ? ""
+                        : " · " + missing.length() + " characters didn't fit, remainder copied";
                 final String msg = replaced
-                        ? outcome + " · undo from the notification" : outcome;
+                        ? outcome + extra + " · undo from the notification" : outcome;
+                final int duration = missing.isEmpty() ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG;
                 main.post(() -> {
-                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, msg, duration).show();
                     stopTimer();
                     setBubble(CREAM, "");
                     if (wave != null) {
@@ -761,11 +793,13 @@ public final class DictationService extends Service implements DictationListener
         io.execute(() -> {
             InsertAccessibilityService svc = InsertAccessibilityService.get();
             String outcome;
+            String overflow = "";
             boolean inserted = false;
             if (svc != null) {
                 InsertAccessibilityService.Result r = svc.insert(result.text);
                 inserted = r.ok;
                 outcome = r.message;
+                overflow = r.overflow;
             } else {
                 outcome = "Accessibility service is off";
             }
@@ -773,11 +807,18 @@ public final class DictationService extends Service implements DictationListener
                 ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                 if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", result.text));
                 outcome = outcome + " — text copied";
+                overflow = "";
+            } else if (!overflow.isEmpty()) {
+                showOverflow(overflow);
             }
+            final String missing = overflow;
+            final String extra = missing.isEmpty() ? ""
+                    : " · " + missing.length() + " characters didn't fit, remainder copied";
             final String msg = inserted
-                    ? outcome + " · undo from the notification" : outcome;
+                    ? outcome + extra + " · undo from the notification" : outcome;
+            final int duration = missing.isEmpty() ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG;
             main.post(() -> {
-                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, msg, duration).show();
                 stopTimer();
                 setBubble(CREAM, "");
                 if (wave != null) {

@@ -3,17 +3,17 @@
 **Mission:** open-source, offline-first voice dictation for Android, with an arcade-inspired UI.
 **Repo:** https://github.com/desukab/wahtuh-pho · **Updated:** 2026-10-22
 
-> Honesty rule: only measured or directly observed results appear here. The v0.3.0 APK compiles, passes local tests, installs over the previous build, and its Home, tabs, Settings, drawer, bubble visibility, and all three arcade games were exercised on the vivo V2251. The refreshed screenshots in `docs/screenshots/` were captured from build `e274e26b…` on that device. Voice, Command Mode, retention, boot recovery, Field Context, and selected-text replacement still need a broader field pass.
+> Honesty rule: only measured or directly observed results appear here. The v0.3.1 APK compiles, passes local tests, and adds character-limit overflow handling to the v0.3.0 build. The v0.3.0 APK was installed over the previous build, and its Home, tabs, Settings, drawer, bubble visibility, and all three arcade games were exercised on the vivo V2251. The screenshots in `docs/screenshots/` were captured from build `e274e26b…` on that device. Voice, Command Mode, retention, boot recovery, Field Context, character-limit reporting, and selected-text replacement still need a broader field pass.
 
-## Android app — v0.3.0
+## Android app — v0.3.1
 
 - Local ASR: Cactus Compute Whistle, 16.9 MB, CPU.
 - Languages: English, German, French, Spanish, Italian, Dutch, Polish, plus auto-detect.
 - UI: 90s arcade theme; Home, Words, Snips, Style tabs; onboarding; dark floating bubble.
-- Insertion: accessibility paste-first with verification, fallback, cursor placement, undo. Search/note placeholders such as “Search YouTube”, “Ask Google”, and “Note” are treated as empty fields instead of existing text.
+- Insertion: accessibility paste-first with verification, fallback, cursor placement, undo. Search/note placeholders such as “Search YouTube”, “Ask Google”, and “Note” are treated as empty fields instead of existing text. Character-limited fields receive only the text that fits; the remainder is copied and shown in a notification.
 - Cloud: Groq, Gemini, Deepgram, OpenAI with user keys encrypted by Android Keystore.
 - Text: punctuation, filler removal, dictionary, snippets, five styles, email dictation, optional text-only cloud cleanup.
-- Precision helpers: local self-corrections (`actually`, `no wait`, `I mean`, `scratch that`), spoken developer identifiers (`camelCase`, `snake_case`, `PascalCase`, `kebab-case`, `dot.case`), file tags (`@main.py`), numbered lists, and local inline edits (delete last sentence/word, bullet/numbered lists, case changes). Tests: **51/51** text, **11/11** VAD.
+- Precision helpers: local self-corrections (`actually`, `no wait`, `I mean`, `scratch that`), spoken developer identifiers (`camelCase`, `snake_case`, `PascalCase`, `kebab-case`, `dot.case`), file tags (`@main.py`), numbered lists, and local inline edits (delete last sentence/word, bullet/numbered lists, case changes). Tests: **51/51** text, **11/11** VAD, **18/18** character-fit.
 - Command Mode: select text, hold the bubble, and speak an edit. On-device handles case, list, and delete commands; Groq, OpenAI, or Gemini adds freeform rewrites. Replaces the selection only if it still matches, with notification undo. Sessions warn at 4 minutes and auto-submit at 5.
 - History retention: KEEP / 24 HOURS / NEVER; 24-hour mode prunes old transcripts and legacy audio; NEVER purges both and stops saving. New dictation audio is never written to disk.
 - Resilience: boot receiver restores a deliberately-running bubble; Settings exposes the battery-optimization exemption. Bubble size (small/normal/large) and opacity (60/80/100%) are configurable.
@@ -38,7 +38,7 @@ The in-app JNI latency has not been measured yet. See [BENCHMARKS.md](BENCHMARKS
 2. Re-test all four cloud providers with live keys, including Command Mode on Groq, OpenAI, and Gemini. Gemini response parsing reads `audioTranscription.text`; OpenAI retries `gpt-4o-transcribe` with legacy fields on a 400/404/415/422.
 3. Measure Whistle quality and latency inside the app across the seven languages.
 4. Field-test accented English and noisy environments; the current sample is tiny.
-5. Keep the v0.3.0 APK, release notes, and screenshots in sync with the tested commit.
+5. Keep the v0.3.1 APK, release notes, and screenshots in sync with the tested commit.
 6. Remaining parity gaps that need engineering, not just testing: streaming partials, local Hinglish/Telugu breadth, dictionary auto-learn/sync, banking-app stand-down, and per-app web-editor shims. See [FEATURE_PARITY.md](FEATURE_PARITY.md).
 
 ## Rust core
@@ -51,4 +51,5 @@ The `crates/` workspace is independent of the shipped APK: audio chunking, engin
 - v0.2.0 moved to Whisper base; Telugu remained unusable locally.
 - v0.3.0 replaced both with Whistle and the arcade UI, dropping Telugu and all sherpa/Vosk/Kotlin/JNA dependencies.
 - v0.3.0 added adaptive VAD, offline arcade games, editable-field bubble gating, drag-to-snooze, and provider-independent text cleanup routing.
+- v0.3.1 adds character-limit aware insertion: it fits text to the destination field, copies the remainder, and shows the dropped words in a notification.
 - Prior research artifacts: `docs/WISPR_FLOW_RESEARCH.md`, `docs/ENGINE_EVALUATION.md`, `docs/EVALUATION.md`, `docs/REA_NOTES.md`.

@@ -16,6 +16,8 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 
+import com.wahtuh.pho.text.FieldFit;
+
 import java.util.List;
 
 /**
@@ -50,7 +52,13 @@ public final class InsertAccessibilityService extends AccessibilityService {
     public static final class Result {
         public final boolean ok;
         public final String message;
-        Result(boolean ok, String message) { this.ok = ok; this.message = message; }
+        public final String overflow;
+        Result(boolean ok, String message) { this(ok, message, ""); }
+        Result(boolean ok, String message, String overflow) {
+            this.ok = ok;
+            this.message = message;
+            this.overflow = overflow == null ? "" : overflow;
+        }
     }
 
     public static boolean isEnabled(Context context) {
@@ -178,7 +186,13 @@ public final class InsertAccessibilityService extends AccessibilityService {
         if (!old.substring(start, end).equals(expected)) {
             return new Result(false, "The selection changed");
         }
-        String insert = normalize(replacement, node, old, start, end);
+        FieldFit fitted = fit(replacement, node, old, start, end);
+        String insert = fitted.text;
+        String overflow = fitted.overflow;
+        if (insert.isEmpty() && !overflow.isEmpty()) {
+            copy(overflow);
+            return new Result(false, "This field is full", overflow);
+        }
         String updated = old.substring(0, start) + insert + old.substring(end);
         int cursor = start + insert.length();
 
@@ -192,7 +206,14 @@ public final class InsertAccessibilityService extends AccessibilityService {
                     if (read == null || read.equals(updated)) {
                         lastInsert = new LastInsert(old, updated, start, end);
                         if (read != null) placeCursor(cursor);
-                        return new Result(true, "Replaced");
+                        return new Result(true, "Replaced", overflow);
+                    }
+                    String partial = overflow.isEmpty()
+                            ? FieldFit.overflowAfterRead(read, old, start, end, insert) : "";
+                    if (!partial.isEmpty()) {
+                        lastInsert = new LastInsert(old, read, start, end);
+                        placeCursor(read.length());
+                        return new Result(true, "Replaced, field limit reached", partial);
                     }
                 }
             } catch (Throwable ignored) {
@@ -204,13 +225,21 @@ public final class InsertAccessibilityService extends AccessibilityService {
         args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, updated);
         if (performVerified(node, updated, args, old, start, end, cursor)) {
             lastInsert = new LastInsert(old, updated, start, end);
-            return new Result(true, "Replaced");
+            return new Result(true, "Replaced", overflow);
+        }
+        String afterSet = readFocusText();
+        String setPartial = overflow.isEmpty()
+                ? FieldFit.overflowAfterRead(afterSet, old, start, end, insert) : "";
+        if (!setPartial.isEmpty()) {
+            lastInsert = new LastInsert(old, afterSet, start, end);
+            placeCursor(afterSet.length());
+            return new Result(true, "Replaced, field limit reached", setPartial);
         }
         SystemClock.sleep(180);
         if (updated.equals(readFocusText())) {
             lastInsert = new LastInsert(old, updated, start, end);
             placeCursor(cursor);
-            return new Result(true, "Replaced");
+            return new Result(true, "Replaced", overflow);
         }
         if (cm != null && !insert.isEmpty()) {
             cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", insert));
@@ -325,14 +354,23 @@ public final class InsertAccessibilityService extends AccessibilityService {
         if (start < 0 || start > old.length()) start = old.length();
         if (end < start || end > old.length()) end = start;
 
-        String insert = normalize(text, node, old, start, end);
-        if (insert.isEmpty()) return new Result(false, "Nothing to insert");
-        if (start > 0 && start <= old.length() && !insert.isEmpty()) {
+        String dictated = text;
+        if (start > 0 && start <= old.length() && !dictated.isEmpty()) {
             char prev = old.charAt(start - 1);
-            char first = insert.charAt(0);
+            char first = dictated.charAt(0);
             if (Character.isLetterOrDigit(prev) && Character.isLetterOrDigit(first)) {
-                insert = " " + insert;
+                dictated = " " + dictated;
             }
+        }
+        FieldFit fitted = fit(dictated, node, old, start, end);
+        String insert = fitted.text;
+        String overflow = fitted.overflow;
+        if (insert.isEmpty()) {
+            if (!overflow.isEmpty()) {
+                copy(overflow);
+                return new Result(false, "This field is full", overflow);
+            }
+            return new Result(false, "Nothing to insert");
         }
         String updated = old.substring(0, start) + insert + old.substring(end);
         int cursor = start + insert.length();
@@ -349,12 +387,19 @@ public final class InsertAccessibilityService extends AccessibilityService {
                     String read = readFocusText();
                     if (read == null) {
                         lastInsert = new LastInsert(old, updated, start, end);
-                        return new Result(true, "Pasted");
+                        return new Result(true, "Pasted", overflow);
                     }
                     if (read.equals(updated)) {
                         lastInsert = new LastInsert(old, updated, start, end);
                         placeCursor(cursor);
-                        return new Result(true, "Inserted");
+                        return new Result(true, "Inserted", overflow);
+                    }
+                    String partial = overflow.isEmpty()
+                            ? FieldFit.overflowAfterRead(read, old, start, end, insert) : "";
+                    if (!partial.isEmpty()) {
+                        lastInsert = new LastInsert(old, read, start, end);
+                        placeCursor(read.length());
+                        return new Result(true, "Inserted, field limit reached", partial);
                     }
                 }
             } catch (Throwable ignored) {
@@ -366,7 +411,15 @@ public final class InsertAccessibilityService extends AccessibilityService {
         args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, updated);
         if (performVerified(node, updated, args, old, start, end, cursor)) {
             lastInsert = new LastInsert(old, updated, start, end);
-            return new Result(true, "Inserted");
+            return new Result(true, "Inserted", overflow);
+        }
+        String afterSet = readFocusText();
+        String setPartial = overflow.isEmpty()
+                ? FieldFit.overflowAfterRead(afterSet, old, start, end, insert) : "";
+        if (!setPartial.isEmpty()) {
+            lastInsert = new LastInsert(old, afterSet, start, end);
+            placeCursor(afterSet.length());
+            return new Result(true, "Inserted, field limit reached", setPartial);
         }
 
         // Some IMEs commit asynchronously; give the app one more beat and check.
@@ -374,7 +427,15 @@ public final class InsertAccessibilityService extends AccessibilityService {
         if (updated.equals(readFocusText())) {
             lastInsert = new LastInsert(old, updated, start, end);
             placeCursor(cursor);
-            return new Result(true, "Inserted");
+            return new Result(true, "Inserted", overflow);
+        }
+        String finalRead = readFocusText();
+        String finalPartial = overflow.isEmpty()
+                ? FieldFit.overflowAfterRead(finalRead, old, start, end, insert) : "";
+        if (!finalPartial.isEmpty()) {
+            lastInsert = new LastInsert(old, finalRead, start, end);
+            placeCursor(finalRead.length());
+            return new Result(true, "Inserted, field limit reached", finalPartial);
         }
 
         if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", text));
@@ -432,17 +493,17 @@ public final class InsertAccessibilityService extends AccessibilityService {
         return t == null ? null : t.toString();
     }
 
-    private String normalize(String text, AccessibilityNodeInfo node, String old,
-                             int start, int end) {
-        String insert = text;
-        if (node.getMaxTextLength() > 0) {
-            int room = node.getMaxTextLength() - (old.length() - (end - start));
-            if (room <= 0) return "";
-            if (insert.length() > room) insert = insert.substring(0, room);
-        }
+    private FieldFit fit(String text, AccessibilityNodeInfo node, String old,
+                         int start, int end) {
+        String insert = text == null ? "" : text;
         boolean multiline = (node.getInputType() & InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0;
         if (!multiline) insert = insert.replace('\n', ' ');
-        return insert;
+        return FieldFit.fit(insert, node.getMaxTextLength(), old, start, end);
+    }
+
+    private void copy(String value) {
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", value));
     }
 
     private static String asString(CharSequence value) {

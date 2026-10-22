@@ -30,7 +30,7 @@ Wispr Flow's paid promise, our clean-room notes, and the feature gaps we deliber
 
 ## Status
 
-- **Android app: v0.3.0.** Whistle local ASR, seven languages, verified insertion, snippets, writing styles, self-corrections, developer dictation, inline edit commands, selected-text Command Mode, local history retention, boot recovery, and optional cloud providers. Builds as an 18 MB APK. Text tests pass **51/51** and VAD checks **11/11**. The UI, drawer, tabs, bubble visibility, and all three arcade games were exercised on a vivo V2251; voice, command, and cloud paths still need broader field testing. See [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md) for the honest Wispr Flow comparison.
+- **Android app: v0.3.1.** Whistle local ASR, seven languages, verified insertion, snippets, writing styles, self-corrections, developer dictation, inline edit commands, selected-text Command Mode, local history retention, boot recovery, and optional cloud providers. Fields with a character limit now insert what fits and surface the remaining dictated words instead of dropping them. Builds as an 18 MB APK. Text tests pass **51/51**, VAD checks **11/11**, and character-fit checks **18/18**. The UI, drawer, tabs, bubble visibility, and all three arcade games were exercised on a vivo V2251; voice, command, and cloud paths still need broader field testing. See [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md) for the honest Wispr Flow comparison.
 - **Rust core: scaffold + real local Whisper engine.** 74 workspace tests pass; the shipped APK has its own JNI bridge to Whistle and does **not** link the Rust crates.
 - The Android app is Gradle-free and built with `aapt2`, `javac`, D8, and `apksigner`.
 
@@ -41,6 +41,7 @@ Wispr Flow's paid promise, our clean-room notes, and the feature gaps we deliber
 - **Floating bubble** — draggable dark pixel pill with an animated waveform, live timer, and distinct recording/working/error states. It appears only when an editable text field and the keyboard are open. Drag it to the 5 MIN or 10 MIN X target to snooze the bubble.
 - **Voice keyboard** — QWERTY/numbers IME with a Dictate button.
 - **Verified cross-app insertion** — paste-first into the focused field, read back and verify, `ACTION_SET_TEXT` fallback, cursor placement, password-field refusal, and notification undo. If every path is refused, the text is copied instead.
+- **Character-limit aware** — when the destination field reports a limit or silently truncates, the app inserts what fits, copies the remainder, and shows the dropped words in a notification instead of losing them.
 - **Dictionary and snippets** — names, products, and spoken triggers that expand into full text.
 - **Self-corrections and developer dictation** — "meet at five, actually six", "send it to John, I mean Jane", and "scratch that" resolve locally. Spoken `camel case`, `snake_case`, `PascalCase`, `kebab-case`, `dot.case`, and file tags become identifiers without a cloud call. Numbered lists are recognized from "first… second… third…".
 - **Inline edit commands** — "delete the last sentence", "delete the last word", "make that a bullet list", "make that a numbered list", "make that uppercase", "make that lowercase", and "capitalize that" work locally with no cloud key.
@@ -56,8 +57,8 @@ Wispr Flow's paid promise, our clean-room notes, and the feature gaps we deliber
 
 Requirements: Android 8.0 (API 26) or newer, arm64 device.
 
-1. Download `wahtuh-pho-0.3.0.apk` from the GitHub Releases page.
-2. `adb install -r wahtuh-pho-0.3.0.apk` (or open the file on the phone).
+1. Download `wahtuh-pho-0.3.1.apk` from the GitHub Releases page.
+2. `adb install -r wahtuh-pho-0.3.1.apk` (or open the file on the phone).
 3. Open the app and follow the arcade setup:
    - Choose on-device or bring your own cloud key.
    - Pick one of the seven languages, or leave auto-detect on.
@@ -99,7 +100,7 @@ export ANDROID_JAR=$HOME/asdk/android-35/android.jar
 ./scripts/build.sh            # aapt2, javac, D8, zipalign, apksigner
 ```
 
-Output: `build/wahtuh-pho-0.3.0.apk`. Override signing with
+Output: `build/wahtuh-pho-0.3.1.apk`. Override signing with
 `WAHTUH_KEYSTORE`, `WAHTUH_KEY_ALIAS`, `WAHTUH_STORE_PASS`, `WAHTUH_KEY_PASS`.
 Without them a local debug keystore is generated for testing only.
 
@@ -135,11 +136,11 @@ Full details: [docs/PRIVACY.md](docs/PRIVACY.md) and [docs/ANDROID_APP.md](docs/
 
 - Whistle supports seven languages only. Telugu is intentionally absent because the model does not transcribe it.
 - Local accuracy was evaluated on a small set of clips. Accents, noisy rooms, and code-switching remain under-tested.
-- Insertion overwrites the clipboard by design and cannot be verified in fields that hide their text (some WebViews). Notification undo only works while the field still matches the inserted result.
+- Insertion overwrites the clipboard by design and cannot be verified in fields that hide their text (some WebViews). Notification undo only works while the field still matches the inserted result. Character-limit reporting is best-effort: fields that hide their text or truncate without exposing a limit may still drop words silently.
 - Freeform Command Mode ("make this professional") requires a cloud key and an internet connection; local Command Mode covers case, list, and delete edits. It replaces the selection only if the selected text still matches what was read when recording began.
 - Transcription is batch, not streaming. Words appear after release rather than as you speak.
 - On-device language breadth is seven languages. Cloud auto-detect can cover more, but there is no local Hinglish or Telugu model.
-- Sideloaded v0.3.0, not a Play Store release. No account or sync.
+- Sideloaded v0.3.1, not a Play Store release. No account or sync.
 - App-aware tone covers common chat/email packages and falls back to the selected Default style elsewhere. It uses the package name only, never screen contents. Field Context is a separate opt-in switch, off by default, and requires AI polish.
 - Self-correction heuristics are intentionally conservative; ambiguous corrections still rely on AI polish. Whistle's local accuracy remains the main precision limit.
 

@@ -8,8 +8,8 @@ APP="$ROOT/app"
 ANDROID_JAR="${ANDROID_JAR:-$HOME/asdk/android-35/android.jar}"
 VENDOR="${WAHTUH_VENDOR:-$ROOT/vendor}"
 D8_JAR="${D8_JAR:-$VENDOR/d8.jar}"
-VERSION_CODE="${VERSION_CODE:-3}"
-VERSION_NAME="${VERSION_NAME:-0.3.0}"
+VERSION_CODE="${VERSION_CODE:-4}"
+VERSION_NAME="${VERSION_NAME:-0.3.1}"
 ABI="${ABI:-arm64-v8a}"
 
 [ -f "$ANDROID_JAR" ] || { echo "Missing $ANDROID_JAR" >&2; exit 1; }
