@@ -1,7 +1,7 @@
 # Wahtuh Pho — Privacy
 
 **Date:** 2026-10-22 · **Status:** the first half describes the Rust core
-design; the Android section at the end describes the v0.3.2 app.
+design; the Android section at the end describes the v0.4.0 app.
 
 **One line:** in the default mode, your voice never leaves your device and
 the project collects nothing. Cloud transcription exists only as an explicit
@@ -92,6 +92,7 @@ names verified against official docs 2026-10-19; see
 | OpenAI | Audio + transcript request (`api.openai.com`) | OpenAI API data-usage policy |
 | Gemini | Audio (inline data) + transcription config (`generativelanguage.googleapis.com`) | Google API data practices |
 | Deepgram | Audio + transcript request (`api.deepgram.com`) | Deepgram privacy policy / API terms |
+| AssemblyAI | Audio upload (`api.assemblyai.com/v2/upload`), transcript job/poll (`/v2/transcript`); best-effort transcript delete after reading | AssemblyAI privacy policy / API terms |
 
 Optional AI cleanup/post-processing (punctuation restoration, reformatting) is
 a **separate opt-in step**, never applied silently. Local transcription
@@ -144,6 +145,7 @@ Only when you pick a cloud provider **and** turn local-only off:
 | OpenAI | `api.openai.com` transcription | final text only |
 | Gemini | `generativelanguage.googleapis.com` | final text only |
 | Deepgram | `api.deepgram.com` transcription | final text only, routed to your configured Groq/OpenAI/Gemini key; no cleanup if none is configured |
+| AssemblyAI | `api.assemblyai.com` upload + async transcription | final text only, routed to your configured Groq/OpenAI/Gemini key; no cleanup if none is configured |
 
 When **Command Mode** is used, local case/list/delete edits stay on device.
 Freeform rewrites send the selected text and your spoken instruction to the

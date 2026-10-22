@@ -10,12 +10,12 @@ Using a provider means **your audio is uploaded to that provider's servers**
 you explicitly opt out of local-only mode, and the app never falls back to a
 cloud provider silently.
 
-Status of this crate (`crates/wahtuh-providers`): adapters are fully typed
-and validated, but the crate has **no HTTP transport**, so
-`Provider::transcribe` returns `ProviderError::TransportNotConfigured`.
-`Provider::build_request` produces the exact documented request (method, URL,
-headers, body) for the app layer to send once it links a transport
-(e.g. `reqwest`). No audio leaves the device in the current build.
+Status of the Android app: adapters live in
+`app/src/com/wahtuh/pho/cloud/CloudTranscriber.java` and use
+`HttpURLConnection`. The separate `crates/wahtuh-providers` research workspace
+still has no HTTP transport and is not wired into the APK. In the app, every
+provider is opt-in; local Whistle transcription stays the default and cloud is
+never used as a fallback.
 
 ## Model verification log
 
@@ -33,6 +33,9 @@ verified stays **out** of the allow-list — we never invent model names.
 | Deepgram | Model `nova-3`; endpoint `POST https://api.deepgram.com/v1/listen` (raw WAV body, `Content-Type: audio/wav`, `Authorization: Token <key>`); languages `te`, `en`, `multi` (multilingual/code-switching); `smart_format` option | Deepgram pre-recorded docs: https://developers.deepgram.com/docs/pre-recorded-audio ; Telugu: https://deepgram.com/product/speech-to-text/telugu ; pricing via third-party summaries of the official pricing page | 2026-10-19 | ✅ verified (endpoint shape from docs; **live call blocked — stored API key rejected with 401, reconnect needed**) |
 | Deepgram | Per-minute pricing: $0.0043/min mono, $0.0052/min multi (pre-recorded Nova-3) | Third-party summaries of Deepgram's pricing page (brasstranscripts.com, anygen.io) | 2026-10-19 | ⚠️ from secondary sources — recheck Deepgram's pricing page before budgeting |
 | Gemini | Per-token/per-minute pricing | Not found on official docs during this check | 2026-10-19 | ❌ unverified — check Google's pricing page |
+| AssemblyAI | Endpoints `POST /v2/upload` (raw WAV), `POST /v2/transcript`, `GET`/`DELETE /v2/transcript/{id}`; auth header `authorization: <key>`; models `universal-3-5-pro` + `universal-2`; `language_detection` for auto, `language_code` for explicit languages; `keyterms_prompt` for vocabulary | AssemblyAI model selection: https://www.assemblyai.com/docs/pre-recorded-audio/select-the-speech-model ; supported languages: https://www.assemblyai.com/docs/pre-recorded-audio/supported-languages | 2026-10-22 | ✅ verified from official docs; **live call not run — no key available** |
+| AssemblyAI | Supported coverage: Universal-3.5 Pro covers 18 languages including `en`, `de`, `fr`, `es`, `it`, `nl` but not Polish; Universal-2 covers 99 including Polish. The app sends Universal-2 alone for explicit Polish. | AssemblyAI supported-languages doc (above) | 2026-10-22 | ✅ verified |
+| AssemblyAI | Pricing | Not checked against the official pricing page | 2026-10-22 | ❌ unverified — check AssemblyAI pricing before budgeting |
 
 **Gemini 2.5 caveat (2026-10):** multiple reports indicate Google is
 retiring 2.5-series access for *newly created* API keys (`gemini-2.5-flash`
@@ -132,6 +135,46 @@ keys that still have access, but expect it to stop working for new keys.
   before any live transcription runs. Connector doc:
   `~/workspace/custom-connectors/custom.deepgram/CONNECTOR.md`.
 
+## AssemblyAI
+
+- **Where to get a key:** the AssemblyAI dashboard → *Workspace → Manage →
+  API Keys*. The app links to <https://www.assemblyai.com/dashboard>.
+- **Endpoint flow (verified 2026-10-22):** AssemblyAI's pre-recorded API is
+  asynchronous.
+  1. `POST https://api.assemblyai.com/v2/upload` with the raw WAV bytes,
+     `Content-Type: application/octet-stream`, header
+     `authorization: <key>` — note **no `Bearer` prefix**. The response
+     contains `upload_url`.
+  2. `POST https://api.assemblyai.com/v2/transcript` with JSON
+     `{"audio_url": "<upload_url>", "speech_models": ["universal-3-5-pro",
+     "universal-2"], "punctuate": true, "format_text": true, ...}`. Add
+     either `"language_detection": true` or `"language_code": "<code>"`,
+     plus optional `keyterms_prompt` (an array of terms).
+  3. Poll `GET /v2/transcript/{id}` until `status` is `completed` (read
+     `text`) or `error` (read `error`). The app polls every second with a
+     120-second deadline.
+  4. Best effort: `DELETE /v2/transcript/{id}` after reading the text, so the
+     transcript is not left in the account longer than needed. Uploaded audio
+     retention is governed by AssemblyAI's terms; the delete call is not a
+     guarantee that the uploaded object is removed immediately.
+- **Supported models:** `universal-3-5-pro` (highest accuracy, 18 languages)
+  and `universal-2` (99 languages). The app sends both, in that order, so a
+  language outside the Pro set can fall back to Universal-2.
+- **Languages:** Universal-3.5 Pro covers `en`, `de`, `fr`, `es`, `it`, `nl`,
+  among others, but not Polish. Universal-2 covers Polish. Auto mode uses
+  `language_detection`; English is sent as `en_us`. Explicit Polish sends
+  only `universal-2`, so no unsupported-model request is made.
+- **Vocabulary:** the user dictionary is sent as `keyterms_prompt` terms,
+  which Universal-3.5 Pro and Universal-2 both support. Contextual `prompt`
+  is not used.
+- **Cleanup:** AssemblyAI is transcription-only here. If AI polish is on, the
+  app looks for a configured Groq, OpenAI, or Gemini key and sends only the
+  final text there, exactly as it does for Deepgram.
+- **Status 2026-10-22:** adapter implemented and compiled; **no live call
+  has been made** because no AssemblyAI key was available. Treat live
+  behavior and latency as unverified until a key is connected.
+- **Pricing:** not verified — check AssemblyAI's pricing page.
+
 ## Upload disclosure
 
 When you use a cloud provider, **your audio is uploaded to that provider**
@@ -187,11 +230,15 @@ remain a separate research crate.
   `languages[]` and `keywords[]`. On a 400/404/415/422 response it retries
   once with `gpt-4o-transcribe` and the legacy `language`/`prompt` fields.
 - **Deepgram transcription** uses Nova-3 with raw WAV upload.
+- **AssemblyAI transcription** uploads the WAV, submits a Universal-3.5
+  Pro/Universal-2 job, polls for completion, and best-effort deletes the
+  transcript after reading it.
 - **Cleanup is vendor-independent.** Transcription and polish may use
-  different providers. If Deepgram is the transcription provider, the app
-  looks for a configured Groq, OpenAI, or Gemini key and sends only the
-  final text there. If no such key exists, deterministic local cleanup
-  still runs and the AI polish toggle stays off with an explanation.
+  different providers. If Deepgram or AssemblyAI is the transcription
+  provider, the app looks for a configured Groq, OpenAI, or Gemini key and
+  sends only the final text there. If no such key exists, deterministic
+  local cleanup still runs and the AI polish toggle stays off with an
+  explanation.
 
 ## AI cleanup / post-processing is separate and optional
 

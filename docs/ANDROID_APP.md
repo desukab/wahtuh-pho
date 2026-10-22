@@ -15,7 +15,7 @@
 
 Whistle supports **English, German, French, Spanish, Italian, Dutch, and Polish**, plus auto-detect. Telugu is deliberately excluded.
 
-Cloud providers expose the same language list. Deepgram auto mode uses `language=multi`, which supports all seven listed languages except Polish; choose Polish explicitly for Deepgram.
+Cloud providers expose the same language list. Deepgram auto mode uses `language=multi`, which supports all seven listed languages except Polish; choose Polish explicitly for Deepgram. AssemblyAI auto mode uses language detection and sends Universal-3.5 Pro plus Universal-2, so Polish falls back to Universal-2 automatically.
 
 ## Providers
 
@@ -25,6 +25,7 @@ Cloud providers expose the same language list. Deepgram auto mode uses `language
 | Groq | `whisper-large-v3-turbo` | user key |
 | Gemini | `gemini-3.5-transcribe` | user key |
 | Deepgram | `nova-3` | user key |
+| AssemblyAI | `universal-3-5-pro` → `universal-2` | user key |
 | OpenAI | `gpt-transcribe` | user key |
 
 Cloud is never used as a fallback. Local-only mode blocks every cloud call. Keys are encrypted with an Android Keystore AES/GCM key and stored only as ciphertext.

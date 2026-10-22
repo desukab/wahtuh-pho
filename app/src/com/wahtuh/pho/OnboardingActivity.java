@@ -40,7 +40,8 @@ public final class OnboardingActivity extends android.app.Activity {
     private EditText keyInput;
 
     private static final String[] PROVIDERS = {
-            Settings.LOCAL, Settings.GROQ, Settings.GEMINI, Settings.DEEPGRAM, Settings.OPENAI};
+            Settings.LOCAL, Settings.GROQ, Settings.GEMINI, Settings.DEEPGRAM,
+            Settings.ASSEMBLYAI, Settings.OPENAI};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -559,6 +560,7 @@ public final class OnboardingActivity extends android.app.Activity {
             case Settings.GROQ: return "https://console.groq.com/keys";
             case Settings.GEMINI: return "https://aistudio.google.com/apikey";
             case Settings.DEEPGRAM: return "https://console.deepgram.com/";
+            case Settings.ASSEMBLYAI: return "https://www.assemblyai.com/dashboard";
             default: return "https://platform.openai.com/api-keys";
         }
     }

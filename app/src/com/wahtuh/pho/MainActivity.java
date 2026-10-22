@@ -53,7 +53,7 @@ import java.util.Locale;
 public final class MainActivity extends android.app.Activity {
     private static final int REQ_MIC = 10;
     private static final int REQ_NOTIF = 11;
-    private static final String APP_VERSION = "0.3.2";
+    private static final String APP_VERSION = "0.4.0";
 
     private Settings settings;
     private SecureStore secure;
@@ -67,14 +67,16 @@ public final class MainActivity extends android.app.Activity {
     private boolean drawerOpen;
 
     private static final String[] PROVIDERS = {
-            Settings.LOCAL, Settings.GROQ, Settings.GEMINI, Settings.DEEPGRAM, Settings.OPENAI};
+            Settings.LOCAL, Settings.GROQ, Settings.GEMINI, Settings.DEEPGRAM,
+            Settings.ASSEMBLYAI, Settings.OPENAI};
     private static final String[] PROVIDER_NAMES = {
-            "ON-DEVICE", "GROQ", "GEMINI", "DEEPGRAM", "OPENAI"};
+            "ON-DEVICE", "GROQ", "GEMINI", "DEEPGRAM", "ASSEMBLYAI", "OPENAI"};
     private static final String[] PROVIDER_NOTE = {
             "On-device · 7 languages · no key",
             "Fast cloud · your key",
             "Multilingual cloud · your key",
             "Batch cloud · your key",
+            "High-accuracy batch · your key",
             "Cloud · your key"};
 
     @Override
@@ -1127,13 +1129,14 @@ public final class MainActivity extends android.app.Activity {
                         Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (c && Settings.DEEPGRAM.equals(settings.provider()) && !hasCleanupKey()) {
+            if (c && noCleanupModel(settings.provider()) && !hasCleanupKey()) {
                 clean.setChecked(false);
-                Toast.makeText(this, "Deepgram transcribes; add a Groq, OpenAI, or Gemini key to polish",
+                Toast.makeText(this, settings.providerLabel()
+                                + " transcribes; add a Groq, OpenAI, or Gemini key to polish",
                         Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (c && !Settings.DEEPGRAM.equals(settings.provider())
+            if (c && !noCleanupModel(settings.provider())
                     && !secure.has(settings.keyName(settings.provider()))) {
                 clean.setChecked(false);
                 Toast.makeText(this, "Add a " + Settings.providerName(settings.provider())
@@ -1282,10 +1285,14 @@ public final class MainActivity extends android.app.Activity {
     private String polishStatus() {
         if (settings.localOnly() || Settings.LOCAL.equals(settings.provider())) return "";
         if (!settings.cleanup()) return "  ·  polish off";
-        boolean ready = Settings.DEEPGRAM.equals(settings.provider())
+        boolean ready = noCleanupModel(settings.provider())
                 ? hasCleanupKey()
                 : secure.has(settings.keyName(settings.provider()));
         return ready ? "  ·  polish" : "  ·  polish missing key";
+    }
+
+    private static boolean noCleanupModel(String provider) {
+        return Settings.DEEPGRAM.equals(provider) || Settings.ASSEMBLYAI.equals(provider);
     }
 
     private boolean hasCleanupKey() {
@@ -1330,7 +1337,7 @@ public final class MainActivity extends android.app.Activity {
         settings.setProvider(provider);
         settings.setLocalOnly(Settings.LOCAL.equals(provider));
         if (Settings.LOCAL.equals(provider)
-                || (Settings.DEEPGRAM.equals(provider) && !hasCleanupKey())) {
+                || (noCleanupModel(provider) && !hasCleanupKey())) {
             settings.setCleanup(false);
         }
         if (!Settings.LOCAL.equals(provider) && !secure.has(settings.keyName(provider))) {
@@ -1806,6 +1813,7 @@ public final class MainActivity extends android.app.Activity {
             case Settings.GROQ: return "https://console.groq.com/keys";
             case Settings.GEMINI: return "https://aistudio.google.com/apikey";
             case Settings.DEEPGRAM: return "https://console.deepgram.com/";
+            case Settings.ASSEMBLYAI: return "https://www.assemblyai.com/dashboard";
             default: return "https://platform.openai.com/api-keys";
         }
     }

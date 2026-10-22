@@ -240,7 +240,7 @@ trait. The deciding experiment before committing is specified in
 
 ---
 
-# Android app (v0.3.2)
+# Android app (v0.4.0)
 
 The shipped APK is a separate, Gradle-free Android implementation. It does not link the Rust crates.
 
@@ -254,7 +254,7 @@ mic
           └─ DictationController
               ├─ AsrManager → WhistleEngine (JNI → libneedle.a), final transcript
               ├─ TranscriptionRouter (local-only chokepoint)
-              │   └─ CloudTranscriber (Groq / Gemini / Deepgram / OpenAI)
+              │   └─ CloudTranscriber (Groq / Gemini / Deepgram / AssemblyAI / OpenAI)
               ├─ TextPipeline (punctuation, fillers, dictionary, snippets, style)
               ├─ HistoryStore (JSONL, raw + final + edits)
               └─ DictationResult → listener (activity, IME, bubble)

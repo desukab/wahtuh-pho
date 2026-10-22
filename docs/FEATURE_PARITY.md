@@ -12,11 +12,11 @@ structure. No code, assets, or copy were taken.
 
 ## Current matrix
 
-| Capability | Wispr Flow (public/observed) | Wahtuh Pho 0.3.2 | Status |
+| Capability | Wispr Flow (public/observed) | Wahtuh Pho 0.4.0 | Status |
 |---|---|---|---|
 | On-device transcription | Never. Cloud only. | Whistle 16.9 MB CPU model, offline by default, cannot silently fall back | **done (and beyond)** |
 | Voice activity detection | Server/streaming VAD with phrase boundaries | Silero VAD v5 (2.3 MB, ONNX Runtime) on-device with adaptive RMS/ZCR fallback; 20 ms frame mapping and phrase splitting | **done (device verification pending)** |
-| Cloud transcription | Proprietary cloud only | Groq, OpenAI, Gemini, Deepgram with user keys, opt-in | **done** |
+| Cloud transcription | Proprietary cloud only | Groq, OpenAI, Gemini, Deepgram, AssemblyAI with user keys, opt-in | **done** |
 | Push-to-talk | Hold bubble/hotkey | Hold the floating bubble; 380 ms threshold; release transcribes and inserts | **done** |
 | Hands-free toggle | Tap-toggle mode | Tap the bubble to start; tap again to stop | **done** |
 | Live waveform / state UI | Waveform, processing, error, repair, snoozed | Waveform, timer, working/error states, snooze | **done** |
@@ -67,7 +67,7 @@ structure. No code, assets, or copy were taken.
    signals; sync needs an account, which is a deliberate non-goal.
 4. **Web-editor shims.** The sensitive-app guard is behavioral and testable
    without screen capture, but per-editor shims need real-device coverage.
-5. **Deep device verification.** The v0.3.2 build still needs a physical pass
+5. **Deep device verification.** The v0.4.0 build still needs a physical pass
    for the newest features: Command Mode, retention, boot restore, battery, and
    character-limit overflow reporting.
 

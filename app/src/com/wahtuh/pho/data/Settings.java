@@ -9,6 +9,7 @@ public final class Settings {
     public static final String OPENAI = "openai";
     public static final String GEMINI = "gemini";
     public static final String DEEPGRAM = "deepgram";
+    public static final String ASSEMBLYAI = "assemblyai";
 
     public static final String LANG_AUTO = "auto";
     public static final String LANG_EN = "en";
@@ -154,6 +155,7 @@ public final class Settings {
             case OPENAI: return "OpenAI";
             case GEMINI: return "Gemini";
             case DEEPGRAM: return "Deepgram";
+            case ASSEMBLYAI: return "AssemblyAI";
             default: return "On-device";
         }
     }
@@ -164,6 +166,7 @@ public final class Settings {
             case OPENAI: return "OpenAI";
             case GEMINI: return "Gemini";
             case DEEPGRAM: return "Deepgram";
+            case ASSEMBLYAI: return "AssemblyAI";
             default: return "On-device";
         }
     }

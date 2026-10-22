@@ -500,9 +500,12 @@ public final class DictationController {
     private String[] cleanupTarget(Settings settings, String preferred) {
         SecureStore store = new SecureStore(app);
         String[] order = { preferred, Settings.GROQ, Settings.OPENAI, Settings.GEMINI };
+        boolean separateCleanup = Settings.DEEPGRAM.equals(preferred)
+                || Settings.ASSEMBLYAI.equals(preferred);
         for (String p : order) {
-            if (Settings.LOCAL.equals(p) || Settings.DEEPGRAM.equals(p)) continue;
-            if (!p.equals(preferred) && !Settings.DEEPGRAM.equals(preferred)) continue;
+            if (Settings.LOCAL.equals(p) || Settings.DEEPGRAM.equals(p)
+                    || Settings.ASSEMBLYAI.equals(p)) continue;
+            if (!p.equals(preferred) && !separateCleanup) continue;
             try {
                 String key = store.get(settings.keyName(p));
                 if (key != null && !key.trim().isEmpty()) return new String[] { p, key };

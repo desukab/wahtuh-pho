@@ -26,11 +26,14 @@ public final class CloudTranscriber {
     public static final String OPENAI_FALLBACK_MODEL = "gpt-4o-transcribe";
     public static final String GEMINI_MODEL = "gemini-3.5-transcribe";
     public static final String DEEPGRAM_MODEL = "nova-3";
+    public static final String ASSEMBLYAI_MODEL = "universal-3-5-pro";
+    public static final String ASSEMBLYAI_FALLBACK_MODEL = "universal-2";
 
     public static final String GROQ_TRANSCRIBE = "https://api.groq.com/openai/v1/audio/transcriptions";
     public static final String OPENAI_TRANSCRIBE = "https://api.openai.com/v1/audio/transcriptions";
     public static final String GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
     public static final String DEEPGRAM_LISTEN = "https://api.deepgram.com/v1/listen";
+    public static final String ASSEMBLYAI_BASE = "https://api.assemblyai.com";
 
     public static final String GROQ_CHAT = "https://api.groq.com/openai/v1/chat/completions";
     public static final String OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
@@ -77,6 +80,8 @@ public final class CloudTranscriber {
                 return geminiTranscribe(apiKey, wav, language, vocabularyPrompt);
             case "deepgram":
                 return deepgramTranscribe(apiKey, wav, language);
+            case "assemblyai":
+                return assemblyAiTranscribe(apiKey, wav, language, vocabularyPrompt);
             default:
                 throw new IllegalArgumentException("Unknown cloud provider: " + provider);
         }
@@ -116,6 +121,123 @@ public final class CloudTranscriber {
         String text = alternatives.getJSONObject(0).optString("transcript", "");
         if (text.trim().isEmpty()) throw new IllegalStateException("deepgram returned no text");
         return text.trim();
+    }
+
+    /**
+     * AssemblyAI is asynchronous: upload the WAV, submit a transcript job, then
+     * poll until it finishes. Only the finished text is returned to the caller.
+     */
+    private static String assemblyAiTranscribe(String key, byte[] wav, String language,
+                                               String prompt) throws Exception {
+        String uploadUrl = assemblyAiUpload(key, wav);
+        JSONObject body = new JSONObject();
+        body.put("audio_url", uploadUrl);
+        String lang = assemblyAiLanguage(language);
+        JSONArray models = new JSONArray();
+        if (!"pl".equals(lang)) models.put(ASSEMBLYAI_MODEL);
+        models.put(ASSEMBLYAI_FALLBACK_MODEL);
+        body.put("speech_models", models);
+        body.put("punctuate", true);
+        body.put("format_text", true);
+        if (lang.isEmpty()) {
+            body.put("language_detection", true);
+        } else {
+            body.put("language_code", lang);
+        }
+        JSONArray keyterms = new JSONArray();
+        for (String term : vocabularyTerms(prompt)) {
+            keyterms.put(term);
+            if (keyterms.length() >= 200) break;
+        }
+        if (keyterms.length() > 0) body.put("keyterms_prompt", keyterms);
+
+        JSONObject created = assemblyAiJson("POST", ASSEMBLYAI_BASE + "/v2/transcript",
+                key, body);
+        String id = created.optString("id", "");
+        if (id.isEmpty()) throw new IllegalStateException("assemblyai returned no transcript id");
+        String job = ASSEMBLYAI_BASE + "/v2/transcript/" + URLEncoder.encode(id, "UTF-8");
+        long deadline = System.currentTimeMillis() + 120000L;
+        try {
+            while (System.currentTimeMillis() < deadline) {
+                JSONObject json = assemblyAiJson("GET", job, key, null);
+                String status = json.optString("status", "");
+                if ("completed".equals(status)) {
+                    String text = json.optString("text", "");
+                    if (text.trim().isEmpty()) {
+                        throw new IllegalStateException("assemblyai returned no text");
+                    }
+                    return text.trim();
+                }
+                if ("error".equals(status)) {
+                    throw new IllegalStateException("assemblyai transcription failed: "
+                            + safe(json.optString("error", "unknown error")));
+                }
+                if (!"queued".equals(status) && !"processing".equals(status)) {
+                    throw new IllegalStateException("assemblyai returned status: " + status);
+                }
+                Thread.sleep(1000L);
+            }
+            throw new IllegalStateException("assemblyai transcription timed out");
+        } finally {
+            try {
+                assemblyAiJson("DELETE", job, key, null);
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private static String assemblyAiUpload(String key, byte[] wav) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(ASSEMBLYAI_BASE + "/v2/upload")
+                .openConnection();
+        c.setRequestMethod("POST");
+        c.setConnectTimeout(20000);
+        c.setReadTimeout(120000);
+        c.setDoOutput(true);
+        c.setRequestProperty("authorization", key);
+        c.setRequestProperty("Content-Type", "application/octet-stream");
+        c.setFixedLengthStreamingMode(wav.length);
+        try (OutputStream out = c.getOutputStream()) { out.write(wav); }
+        String response = read(c);
+        int code = c.getResponseCode();
+        c.disconnect();
+        if (code < 200 || code >= 300) {
+            throw new IllegalStateException("assemblyai upload HTTP " + code + ": "
+                    + safe(response));
+        }
+        String url = new JSONObject(response).optString("upload_url", "");
+        if (url.isEmpty()) throw new IllegalStateException("assemblyai returned no upload url");
+        return url;
+    }
+
+    private static JSONObject assemblyAiJson(String method, String endpoint, String key,
+                                             JSONObject body) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(endpoint).openConnection();
+        c.setRequestMethod(method);
+        c.setConnectTimeout(20000);
+        c.setReadTimeout(30000);
+        c.setRequestProperty("authorization", key);
+        if (body != null) {
+            byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setFixedLengthStreamingMode(bytes.length);
+            try (OutputStream out = c.getOutputStream()) { out.write(bytes); }
+        }
+        String response = read(c);
+        int code = c.getResponseCode();
+        c.disconnect();
+        if (code < 200 || code >= 300) {
+            throw new IllegalStateException("assemblyai HTTP " + code + ": " + safe(response));
+        }
+        if (response == null || response.trim().isEmpty()) return new JSONObject();
+        return new JSONObject(response);
+    }
+
+    private static String assemblyAiLanguage(String language) {
+        if (language == null) return "";
+        String code = language.trim().toLowerCase(Locale.US);
+        if (code.isEmpty() || "auto".equals(code)) return "";
+        if ("en".equals(code)) return "en_us";
+        return code;
     }
 
     private static String openAiStyle(String endpoint, String key, String model, byte[] wav,
@@ -296,6 +418,8 @@ public final class CloudTranscriber {
             case "gemini":
                 return geminiText(key, instruction);
             case "deepgram":
+                return text.trim();
+            case "assemblyai":
                 return text.trim();
             default:
                 throw new IllegalArgumentException("Unknown cleanup provider: " + provider);
