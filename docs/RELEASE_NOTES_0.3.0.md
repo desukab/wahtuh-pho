@@ -77,8 +77,8 @@ Streaming partials, local Hinglish/Telugu breadth, dictionary auto-learn/sync,
 banking-app stand-down, and per-app web-editor shims are not in this build. Voice,
 Command Mode, retention, boot recovery, Field Context, and selected-text
 replacement still need a broader field pass. No Play Store distribution; install
-the APK directly. See [FEATURE_PARITY.md](FEATURE_PARITY.md) for the comparison
-and [PROJECT_STATUS.md](PROJECT_STATUS.md) for the device-test checklist.
+the APK directly. See [FEATURE_PARITY.md](https://github.com/desukab/wahtuh-pho/blob/main/docs/FEATURE_PARITY.md) for the comparison
+and [PROJECT_STATUS.md](https://github.com/desukab/wahtuh-pho/blob/main/docs/PROJECT_STATUS.md) for the device-test checklist.
 
 ## Install
 
