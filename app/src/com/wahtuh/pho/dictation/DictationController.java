@@ -10,6 +10,8 @@ import com.wahtuh.pho.asr.AsrManager;
 import com.wahtuh.pho.asr.AsrOutput;
 import com.wahtuh.pho.audio.AudioCapture;
 import com.wahtuh.pho.audio.SpeechAudio;
+import com.wahtuh.pho.asr.SileroVad;
+import com.wahtuh.pho.asr.StreamingAsr;
 import com.wahtuh.pho.audio.Wav;
 import com.wahtuh.pho.cloud.CloudTranscriber;
 import com.wahtuh.pho.cloud.TranscriptionRouter;
@@ -49,6 +51,7 @@ public final class DictationController {
     private final Object lock = new Object();
 
     private AudioCapture capture;
+    private StreamingAsr streaming;
     private DictationListener listener;
     private String state = IDLE;
     private int session;
@@ -124,51 +127,80 @@ public final class DictationController {
             return;
         }
         final boolean local = Settings.LOCAL.equals(settings.provider());
+        final boolean preview = local && settings.streamingPreview();
+        final String language = settings.language();
         io.execute(() -> {
             try {
                 if (local) {
-                    if (!AsrManager.get(app).modelsReady()) {
+                    AsrManager manager = AsrManager.get(app);
+                    if (!manager.modelsReady()
+                            || (preview && !manager.streamingReady())) {
                         emitState(PREPARING, "Getting ready");
-                        AsrManager.get(app).prepareModels();
+                        manager.prepareModels();
                     }
                 }
-                main.post(() -> startCapture(token));
+                StreamingAsr live = null;
+                if (preview && StreamingAsr.supports(language)) {
+                    live = StreamingAsr.open(app, language, text -> {
+                        DictationListener out;
+                        synchronized (lock) {
+                            if (token != session || !busy) return;
+                            out = listener;
+                        }
+                        if (out != null) main.post(() -> out.onPartial(text));
+                    });
+                }
+                final StreamingAsr livePreview = live;
+                main.post(() -> startCapture(token, livePreview));
             } catch (Throwable e) {
                 main.post(() -> fail(token, "Could not prepare models: " + message(e)));
             }
         });
     }
 
-    private void startCapture(int token) {
+    private void startCapture(int token, StreamingAsr live) {
         synchronized (lock) {
-            if (token != session || !busy) return;
+            if (token != session || !busy) {
+                if (live != null) live.close();
+                return;
+            }
         }
         try {
             AudioCapture c = new AudioCapture();
-            c.start(rms -> {
-                DictationListener l;
-                synchronized (lock) {
-                    if (token != session) return;
-                    l = listener;
+            c.start(new AudioCapture.LevelListener() {
+                @Override public void onLevel(float rms) {
+                    DictationListener l;
+                    synchronized (lock) {
+                        if (token != session) return;
+                        l = listener;
+                    }
+                    if (l != null) main.post(() -> l.onLevel(rms));
                 }
-                if (l != null) main.post(() -> l.onLevel(rms));
+
+                @Override public void onAudio(float[] samples, int sampleRate) {
+                    if (live != null) live.add(samples);
+                }
             });
             synchronized (lock) {
                 if (token != session) {
                     c.cancel();
+                    if (live != null) live.close();
                     return;
                 }
                 capture = c;
+                streaming = live;
                 state = RECORDING;
             }
             emitState(RECORDING, "Listening");
         } catch (Throwable e) {
+            if (live != null) live.close();
             fail(token, "Could not start recording: " + message(e));
         }
     }
 
     public void stop() {
         final AudioCapture c;
+        final StreamingAsr live;
         final int token;
         Settings stopSettings = new Settings(app);
         final String style = effectiveStyle(stopSettings);
@@ -182,12 +214,15 @@ public final class DictationController {
             token = session;
             c = capture;
             capture = null;
+            live = streaming;
+            streaming = null;
             if (c == null) {
                 // Still preparing; cancel the pending session.
                 busy = false;
                 session++;
                 commandSource = null;
                 state = IDLE;
+                if (live != null) io.execute(live::close);
                 emitState(IDLE, "Cancelled");
                 return;
             }
@@ -201,6 +236,8 @@ public final class DictationController {
             } catch (Throwable e) {
                 main.post(() -> fail(token, "Recording failed: " + message(e)));
                 return;
+            } finally {
+                if (live != null) live.close();
             }
             finish(token, rec, style, context);
         });
@@ -208,6 +245,7 @@ public final class DictationController {
 
     public void cancel() {
         final AudioCapture c;
+        final StreamingAsr live;
         synchronized (lock) {
             session++;
             busy = false;
@@ -215,9 +253,30 @@ public final class DictationController {
             state = IDLE;
             c = capture;
             capture = null;
+            live = streaming;
+            streaming = null;
         }
+        if (live != null) io.execute(live::close);
         if (c != null) io.execute(c::cancel);
         emitState(IDLE, "Cancelled");
+    }
+
+    private SpeechAudio.Plan speechPlan(float[] samples, int sampleRate) {
+        SileroVad vad = null;
+        try {
+            vad = new SileroVad(app);
+            float[] probabilities = vad.probabilities(samples, sampleRate);
+            if (probabilities != null && probabilities.length > 0) {
+                return SpeechAudio.analyze(samples, sampleRate, probabilities, SileroVad.CHUNK);
+            }
+        } catch (Throwable ignored) {
+            // Missing model, unsupported ABI, or a session failure: keep the local gate.
+        } finally {
+            if (vad != null) {
+                try { vad.close(); } catch (Exception ignored) {}
+            }
+        }
+        return SpeechAudio.analyze(samples, sampleRate);
     }
 
     private void finish(int token, AudioCapture.Recording rec, String style, String context) {
@@ -228,12 +287,16 @@ public final class DictationController {
             commandSource = null;
         }
         try {
-            SpeechAudio.Plan plan = SpeechAudio.analyze(rec.samples, rec.sampleRate);
+            if (rec.samples.length == 0 && rec.error != null && !rec.error.isEmpty()) {
+                main.post(() -> fail(token, "Recording failed: " + rec.error));
+                return;
+            }
+            SpeechAudio.Plan plan = speechPlan(rec.samples, rec.sampleRate);
             if (!plan.hasSpeech()) {
                 main.post(() -> fail(token, "No speech detected."));
                 return;
             }
-            float[] prepared = SpeechAudio.prepare(rec.samples, rec.sampleRate);
+            float[] prepared = SpeechAudio.prepare(rec.samples, rec.sampleRate, plan);
             if (prepared.length < rec.sampleRate / 6) {
                 main.post(() -> fail(token, "No speech detected."));
                 return;
@@ -283,6 +346,9 @@ public final class DictationController {
             if (raw == null || raw.trim().isEmpty()) {
                 main.post(() -> fail(token, "No speech recognized."));
                 return;
+            }
+            synchronized (lock) {
+                if (token != session) return;
             }
 
             Dictionary dict = Dictionary.withUserEntries(Dictionary.load(app), settings.userDictionary());
@@ -355,6 +421,10 @@ public final class DictationController {
             boolean finalCommand = command != null;
             long duration = rec.durationMs;
 
+            synchronized (lock) {
+                if (token != session) return;
+            }
+
             String id = UUID.randomUUID().toString();
             HistoryEntry entry = new HistoryEntry(id, System.currentTimeMillis(), raw, text,
                     engine, provider, finalLanguage, duration, latency, cleaned,
@@ -418,8 +488,13 @@ public final class DictationController {
      */
     private String effectiveStyle(Settings settings) {
         String style = settings.style();
-        if (!settings.appTone() || !Settings.STYLE_DEFAULT.equals(style)) return style;
-        return TextPipeline.styleForPackage(InsertAccessibilityService.focusedPackage());
+        if (!settings.appTone()) return style;
+        String category = TextPipeline.categoryForPackage(
+                InsertAccessibilityService.focusedPackage());
+        String override = settings.styleForCategory(category);
+        if (!Settings.STYLE_AUTO.equals(override)) return override;
+        if (!Settings.STYLE_DEFAULT.equals(style)) return style;
+        return TextPipeline.defaultStyleForCategory(category);
     }
 
     private String[] cleanupTarget(Settings settings, String preferred) {
@@ -438,12 +513,16 @@ public final class DictationController {
     }
 
     private void fail(int token, String message) {
+        StreamingAsr live;
         synchronized (lock) {
             if (token != session) return;
             busy = false;
             commandSource = null;
             state = ERROR;
+            live = streaming;
+            streaming = null;
         }
+        if (live != null) io.execute(live::close);
         DictationListener l;
         synchronized (lock) { l = listener; }
         if (l != null) l.onError(message);

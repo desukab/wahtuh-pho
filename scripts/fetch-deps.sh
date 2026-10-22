@@ -26,4 +26,30 @@ if [ ! -f "$VENDOR/d8.jar" ]; then
   unzip -q "$BT_ZIP" -d "$CACHE/bt35"
   cp "$CACHE/bt35/android-15/lib/d8.jar" "$VENDOR/d8.jar"
 fi
+ORT_AAR="$CACHE/onnxruntime-android-1.20.0.aar"
+fetch "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.20.0/onnxruntime-android-1.20.0.aar" \
+  "$ORT_AAR" "07a8f71ef890afed8c6087a56220e6d558a492804276ee2dd7cb7f6262242027"
+if [ ! -f "$VENDOR/onnxruntime/classes.jar" ] \
+    || [ ! -f "$VENDOR/onnxruntime/arm64-v8a/libonnxruntime.so" ]; then
+  rm -rf "$VENDOR/onnxruntime"
+  mkdir -p "$VENDOR/onnxruntime"
+  unzip -q "$ORT_AAR" "classes.jar" "jni/arm64-v8a/*" -d "$VENDOR/onnxruntime"
+  mv "$VENDOR/onnxruntime/jni/arm64-v8a" "$VENDOR/onnxruntime/arm64-v8a"
+  rmdir "$VENDOR/onnxruntime/jni"
+fi
+SHERPA_AAR="$CACHE/sherpa-onnx-static-link-onnxruntime-1.13.8.aar"
+SHERPA_JAR="$CACHE/sherpa-onnx-jvm-1.13.8.jar"
+fetch "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-static-link-onnxruntime-1.13.8.aar" \
+  "$SHERPA_AAR" "b22c3fc1b6a45666d28892bb2f7694beeb77a8362d7ebd77c1a5431ec9435471"
+fetch "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-jvm-1.13.8.jar" \
+  "$SHERPA_JAR" "77b7b047fade4eadada96b568eb92615049aaf1dc317c7244e46c1ea38b9a63b"
+if [ ! -f "$VENDOR/sherpa-onnx/classes.jar" ] \
+    || [ ! -f "$VENDOR/sherpa-onnx/arm64-v8a/libsherpa-onnx-jni.so" ]; then
+  rm -rf "$VENDOR/sherpa-onnx"
+  mkdir -p "$VENDOR/sherpa-onnx"
+  cp "$SHERPA_JAR" "$VENDOR/sherpa-onnx/classes.jar"
+  unzip -q "$SHERPA_AAR" "jni/arm64-v8a/libsherpa-onnx-jni.so" -d "$VENDOR/sherpa-onnx"
+  mv "$VENDOR/sherpa-onnx/jni/arm64-v8a" "$VENDOR/sherpa-onnx/arm64-v8a"
+  rmdir "$VENDOR/sherpa-onnx/jni"
+fi
 echo "dependencies ready in $VENDOR"

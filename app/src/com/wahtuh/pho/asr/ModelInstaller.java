@@ -12,6 +12,13 @@ public final class ModelInstaller {
     private static final String ASSET = "models/whistle.cact";
     private static final long MODEL_BYTES = 16919407L;
 
+    private static final String STREAM_VERSION = "sherpa-en-20m-1";
+    private static final String STREAM_ASSET_DIR = "models/streaming/";
+    private static final String[] STREAM_FILES = {
+            "encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"};
+    private static final long[] STREAM_BYTES = {
+            42845182L, 539499L, 259572L, 5048L};
+
     private ModelInstaller() {}
 
     public static File modelsDir(Context context) {
@@ -20,6 +27,10 @@ public final class ModelInstaller {
 
     public static File whistleModel(Context context) {
         return new File(modelsDir(context), "whistle.cact");
+    }
+
+    public static File streamingDir(Context context) {
+        return new File(modelsDir(context), "streaming");
     }
 
     public static boolean ready(Context context) {
@@ -61,9 +72,65 @@ public final class ModelInstaller {
         }
     }
 
+    public static boolean streamingReady(Context context) {
+        File dir = streamingDir(context);
+        if (!dir.isDirectory()) return false;
+        for (int i = 0; i < STREAM_FILES.length; i++) {
+            File f = new File(dir, STREAM_FILES[i]);
+            if (!f.isFile() || f.length() != STREAM_BYTES[i]) return false;
+        }
+        File marker = new File(dir, ".ready");
+        return marker.isFile() && STREAM_VERSION.equals(readText(marker));
+    }
+
+    public static synchronized void installStreaming(Context context) throws Exception {
+        if (streamingReady(context)) return;
+        File dir = streamingDir(context);
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            throw new IllegalStateException("Could not create streaming model directory");
+        }
+        AssetManager assets = context.getAssets();
+        for (int i = 0; i < STREAM_FILES.length; i++) {
+            copyAsset(assets, STREAM_ASSET_DIR + STREAM_FILES[i],
+                    new File(dir, STREAM_FILES[i]), STREAM_BYTES[i]);
+        }
+        try (FileOutputStream out = new FileOutputStream(new File(dir, ".ready"))) {
+            out.write(STREAM_VERSION.getBytes("UTF-8"));
+        }
+    }
+
     public static long installedBytes(Context context) {
         File model = whistleModel(context);
-        return model.isFile() ? model.length() : 0;
+        long bytes = model.isFile() ? model.length() : 0;
+        File dir = streamingDir(context);
+        for (String name : STREAM_FILES) {
+            File f = new File(dir, name);
+            if (f.isFile()) bytes += f.length();
+        }
+        return bytes;
+    }
+
+    private static void copyAsset(AssetManager assets, String asset, File dest,
+                                  long expected) throws Exception {
+        File tmp = new File(dest.getParentFile(), dest.getName() + ".tmp");
+        try (InputStream in = assets.open(asset);
+             FileOutputStream out = new FileOutputStream(tmp)) {
+            byte[] buffer = new byte[1 << 16];
+            int n;
+            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+        }
+        if (tmp.length() != expected) {
+            tmp.delete();
+            throw new IllegalStateException("Bundled streaming model is incomplete: " + asset);
+        }
+        if (dest.exists() && !dest.delete()) {
+            tmp.delete();
+            throw new IllegalStateException("Could not replace streaming model: " + asset);
+        }
+        if (!tmp.renameTo(dest)) {
+            tmp.delete();
+            throw new IllegalStateException("Could not install streaming model: " + asset);
+        }
     }
 
     private static void deleteLegacy(Context context) {

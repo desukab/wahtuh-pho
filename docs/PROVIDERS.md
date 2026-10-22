@@ -11,8 +11,8 @@ you explicitly opt out of local-only mode, and the app never falls back to a
 cloud provider silently.
 
 Status of this crate (`crates/wahtuh-providers`): adapters are fully typed
-and validated, but the workspace builds **std-only with no HTTP transport**,
-so `Provider::transcribe` returns `ProviderError::TransportNotConfigured`.
+and validated, but the crate has **no HTTP transport**, so
+`Provider::transcribe` returns `ProviderError::TransportNotConfigured`.
 `Provider::build_request` produces the exact documented request (method, URL,
 headers, body) for the app layer to send once it links a transport
 (e.g. `reqwest`). No audio leaves the device in the current build.
@@ -214,7 +214,7 @@ names/code terms to that text request; it never sends surrounding prose.
 | `MissingKey` | No API key supplied at runtime |
 | `InvalidModel(String)` | Model not in the verified allow-list |
 | `InvalidLanguage(String)` | Language code not accepted by this adapter (Deepgram only) |
-| `TransportNotConfigured` | No HTTP transport linked (current std-only build) |
+| `TransportNotConfigured` | No HTTP transport linked in the research crate |
 | `HttpError(u16)` | Provider returned an HTTP error status |
 | `RateLimited` | HTTP 429 — back off and retry |
 | `Cancelled` | User cancelled (app-layer signal) |

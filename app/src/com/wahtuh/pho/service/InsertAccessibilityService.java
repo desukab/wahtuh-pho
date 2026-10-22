@@ -17,6 +17,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 
 import com.wahtuh.pho.text.FieldFit;
+import com.wahtuh.pho.text.SensitiveApps;
 
 import java.util.List;
 
@@ -90,6 +91,7 @@ public final class InsertAccessibilityService extends AccessibilityService {
             setServiceInfo(info);
         }
         scheduleBubbleSync();
+        DictationService.onAccessibilityAvailable();
     }
 
     @Override
@@ -132,6 +134,7 @@ public final class InsertAccessibilityService extends AccessibilityService {
                 || !node.isVisibleToUser() || node.isPassword()) return "";
         CharSequence pkg = node.getPackageName();
         if (pkg != null && service.getPackageName().contentEquals(pkg)) return "";
+        if (pkg != null && SensitiveApps.blocks(pkg.toString())) return "";
         CharSequence value = node.getText();
         if (value == null) return "";
         String text = value.toString().trim();
@@ -150,6 +153,7 @@ public final class InsertAccessibilityService extends AccessibilityService {
         if (node == null || node.isPassword()) return "";
         CharSequence pkg = node.getPackageName();
         if (pkg != null && service.getPackageName().contentEquals(pkg)) return "";
+        if (pkg != null && SensitiveApps.blocks(pkg.toString())) return "";
         CharSequence value = node.getText();
         if (value == null) return "";
         String text = value.toString();
@@ -175,6 +179,9 @@ public final class InsertAccessibilityService extends AccessibilityService {
         CharSequence pkg = node.getPackageName();
         if (pkg != null && getPackageName().contentEquals(pkg)) {
             return new Result(false, "Open another app, then use the floating bubble");
+        }
+        if (pkg != null && SensitiveApps.blocks(pkg.toString())) {
+            return new Result(false, "Sensitive app: dictation is off");
         }
         CharSequence current = node.getText();
         String old = current == null ? "" : current.toString();
@@ -310,7 +317,9 @@ public final class InsertAccessibilityService extends AccessibilityService {
         if (field == null || !field.isEditable() || !field.isEnabled()
                 || !field.isVisibleToUser() || field.isPassword()) return false;
         CharSequence pkg = field.getPackageName();
-        return pkg == null || !getPackageName().contentEquals(pkg);
+        if (pkg == null) return true;
+        return !getPackageName().contentEquals(pkg)
+                && !SensitiveApps.blocks(pkg.toString());
     }
 
     private void captureFocus() {
@@ -335,6 +344,9 @@ public final class InsertAccessibilityService extends AccessibilityService {
         CharSequence pkg = node.getPackageName();
         if (pkg != null && getPackageName().contentEquals(pkg)) {
             return new Result(false, "Open another app, then use the floating bubble");
+        }
+        if (pkg != null && SensitiveApps.blocks(pkg.toString())) {
+            return new Result(false, "Sensitive app: dictation is off");
         }
 
         CharSequence existing = node.getText();
@@ -532,6 +544,7 @@ public final class InsertAccessibilityService extends AccessibilityService {
             focused.recycle();
             focused = null;
         }
+        DictationService.onAccessibilityLost();
         super.onDestroy();
     }
 }

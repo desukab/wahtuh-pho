@@ -2,6 +2,8 @@ import com.wahtuh.pho.text.Dictionary;
 import com.wahtuh.pho.text.FieldText;
 import com.wahtuh.pho.text.Metrics;
 import com.wahtuh.pho.text.ProcessedResult;
+import com.wahtuh.pho.text.SensitiveApps;
+import com.wahtuh.pho.text.Snippets;
 import com.wahtuh.pho.text.TextPipeline;
 
 import java.util.ArrayList;
@@ -30,8 +32,41 @@ public final class TextPipelineTest {
         r = pipeline.process("openai is useful", withDict);
         check("dictionary", "Open AI is useful.", r.text);
 
+        Dictionary canonical = Dictionary.withUserEntries(
+                new Dictionary(1, new ArrayList<>()), "OpenAI");
+        r = pipeline.process("openai is useful", new TextPipeline.Options(canonical, true, true, "en"));
+        check("single-word dictionary canonical spelling", "OpenAI is useful.", r.text);
+
         r = pipeline.process("um I I think uh the the cat is nice", options);
         check("fillers and debounce", "I think the cat is nice.", r.text);
+
+        Snippets multiline = Snippets.parse("sig=" + Snippets.escape("first line\nsecond line"));
+        check("multiline snippet roundtrip", "first line\nsecond line",
+                multiline.entries().get(0).expansion);
+        Snippets path = Snippets.parse("path=" + Snippets.escape("C:\\tmp\\new"));
+        check("snippet backslash roundtrip", "C:\\tmp\\new",
+                path.entries().get(0).expansion);
+        TextPipeline.Options withSnippet = new TextPipeline.Options(
+                new Dictionary(1, new ArrayList<>()), true, true, "en");
+        withSnippet.snippets = multiline;
+        r = pipeline.process("add sig now", withSnippet);
+        check("multiline snippet expansion", "Add first line\nSecond line now.", r.text);
+
+        check("sensitive app: bank", SensitiveApps.blocks("com.chase.sig.android"));
+        check("sensitive app: password manager", SensitiveApps.blocks("com.bitwarden"));
+        check("sensitive app: wallet", SensitiveApps.blocks("com.google.android.apps.walletnfcrel"));
+        check("not sensitive: messenger", !SensitiveApps.blocks("com.whatsapp"));
+        check("not sensitive: self", !SensitiveApps.blocks("com.wahtuh.pho"));
+        check("category: email", "email",
+                TextPipeline.categoryForPackage("com.google.android.gm"));
+        check("category: workplace", "work",
+                TextPipeline.categoryForPackage("com.slack"));
+        check("category: chat", "chat",
+                TextPipeline.categoryForPackage("com.whatsapp"));
+        check("preset: email formal", "formal",
+                TextPipeline.styleForPackage("com.google.android.gm"));
+        check("preset: chat casual", "casual",
+                TextPipeline.styleForPackage("com.whatsapp"));
 
         r = pipeline.process("hello comma world question mark", options);
         check("spoken punctuation", "Hello, world?", r.text);
@@ -188,6 +223,10 @@ public final class TextPipelineTest {
             System.exit(1);
         }
         System.out.println("RESULT: " + passed + "/" + (passed + failed) + " checks passed");
+    }
+
+    private static void check(String name, boolean ok) {
+        check(name, "true", Boolean.toString(ok));
     }
 
     private static void check(String name, String expected, String actual) {

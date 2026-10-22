@@ -26,6 +26,16 @@ public final class SpeechAudioTest {
         check("trim removes padding", true,
                 SpeechAudio.trim(padded, RATE).length < padded.length);
 
+        float[] neural = new float[(tone.length + 511) / 512];
+        Arrays.fill(neural, 0.9f);
+        SpeechAudio.Plan silero = SpeechAudio.analyze(tone, RATE, neural, 512);
+        check("neural probabilities detect speech", true, silero.hasSpeech());
+        check("neural plan prepares audio", true,
+                SpeechAudio.prepare(tone, RATE, silero).length > RATE / 4);
+        float[] silentNeural = new float[(silence.length + 511) / 512];
+        check("neural silence rejected", false,
+                SpeechAudio.analyze(silence, RATE, silentNeural, 512).hasSpeech());
+
         float[] split = join(tone(420, 0.2f), new float[RATE * 13 / 10], tone(420, 0.2f));
         SpeechAudio.Plan two = SpeechAudio.analyze(split, RATE);
         check("pause splits segments", 2, two.segments.size());

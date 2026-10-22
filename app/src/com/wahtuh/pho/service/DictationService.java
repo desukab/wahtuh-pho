@@ -31,6 +31,7 @@ import com.wahtuh.pho.MainActivity;
 import com.wahtuh.pho.dictation.DictationController;
 import com.wahtuh.pho.dictation.DictationListener;
 import com.wahtuh.pho.dictation.DictationResult;
+import com.wahtuh.pho.text.SensitiveApps;
 import com.wahtuh.pho.ui.Ui;
 
 import java.text.SimpleDateFormat;
@@ -57,8 +58,10 @@ public final class DictationService extends Service implements DictationListener
     private static final long SESSION_LIMIT_MS = 5 * 60 * 1000L;
 
     private static final String CHANNEL = "wahtuh_dictation";
+    private static final String RECOVERY_CHANNEL = "wahtuh_recovery";
     private static final int NOTICE = 41;
     private static final int OVERFLOW_NOTICE = 42;
+    private static final int RECOVERY_NOTICE = 43;
     public static volatile boolean running;
     private static volatile DictationService instance;
 
@@ -72,6 +75,7 @@ public final class DictationService extends Service implements DictationListener
     private WindowManager wm;
     private View bubble;
     private TextView label;
+    private volatile String liveText = "";
     private WaveView wave;
     private WindowManager.LayoutParams params;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -95,16 +99,41 @@ public final class DictationService extends Service implements DictationListener
     private int snoozeTargetY;
     private int snoozeLeftX;
     private int snoozeRightX;
+    private int accessibilityMisses;
 
     private final Runnable wakeTask = this::wake;
     private final Runnable holdStartTask = this::beginHold;
+
+    private final Runnable accessibilityWatch = new Runnable() {
+        @Override public void run() {
+            if (!running) return;
+            boolean ready = InsertAccessibilityService.isEnabled(DictationService.this)
+                    && InsertAccessibilityService.get() != null;
+            if (ready) {
+                accessibilityMisses = 0;
+                clearRecoveryNotification();
+            } else if (++accessibilityMisses >= 2) {
+                hideBubble();
+                showRecoveryNotification();
+                if (accessibilityMisses == 2) {
+                    Toast.makeText(DictationService.this,
+                            "Text insertion is off — open Accessibility to restore",
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+            main.postDelayed(this, 15000);
+        }
+    };
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             if (label == null || recordingStart == 0) return;
             long elapsed = System.currentTimeMillis() - recordingStart;
             long secs = elapsed / 1000L;
-            label.setText(String.format(java.util.Locale.US, "%d:%02d", secs / 60, secs % 60));
+            String live = liveText;
+            label.setText(live.isEmpty()
+                    ? String.format(java.util.Locale.US, "%d:%02d", secs / 60, secs % 60)
+                    : live);
             if (elapsed >= SESSION_WARN_MS && !sessionWarned) {
                 sessionWarned = true;
                 Toast.makeText(DictationService.this, "One minute left in this session",
@@ -127,6 +156,16 @@ public final class DictationService extends Service implements DictationListener
         if (service != null) service.main.post(() -> service.setInputTextVisible(visible));
     }
 
+    public static void onAccessibilityLost() {
+        DictationService service = instance;
+        if (service != null) service.main.post(service::handleAccessibilityLost);
+    }
+
+    public static void onAccessibilityAvailable() {
+        DictationService service = instance;
+        if (service != null) service.main.post(service::handleAccessibilityAvailable);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -138,6 +177,8 @@ public final class DictationService extends Service implements DictationListener
         bubbleY = getSharedPreferences("wahtuh_bubble", MODE_PRIVATE)
                 .getInt("y", Ui.dp(this, 180));
         createChannel();
+        createRecoveryChannel();
+        main.postDelayed(accessibilityWatch, 15000);
     }
 
     @Override
@@ -280,13 +321,79 @@ public final class DictationService extends Service implements DictationListener
         nm.createNotificationChannel(c);
     }
 
+    private void createRecoveryChannel() {
+        if (Build.VERSION.SDK_INT < 26) return;
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (nm == null) return;
+        NotificationChannel c = new NotificationChannel(RECOVERY_CHANNEL,
+                "Insertion recovery", NotificationManager.IMPORTANCE_DEFAULT);
+        c.setDescription("Warns when Android turns off text insertion");
+        c.setShowBadge(true);
+        nm.createNotificationChannel(c);
+    }
+
+    private void handleAccessibilityLost() {
+        if (!running) return;
+        accessibilityMisses = 2;
+        if (sessionActive || DictationController.get(this).busy()) {
+            DictationController.get(this).stop();
+        }
+        hideBubble();
+        showRecoveryNotification();
+        Toast.makeText(this, "Text insertion is off — open Accessibility to restore",
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void handleAccessibilityAvailable() {
+        accessibilityMisses = 0;
+        clearRecoveryNotification();
+        if (inputTextVisible && !sessionActive && !snoozed()) showBubble();
+    }
+
+    private void showRecoveryNotification() {
+        if (!running || !new com.wahtuh.pho.data.Settings(this).bubbleEnabled()) return;
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            Intent fix = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            PendingIntent pi = PendingIntent.getActivity(this, 6, fix,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                    ? new Notification.Builder(this, RECOVERY_CHANNEL)
+                    : new Notification.Builder(this);
+            Icon icon = Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now);
+            b.setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                    .setContentTitle("Text insertion is off")
+                    .setContentText("Tap to restore it so dictation can type for you")
+                    .setContentIntent(pi)
+                    .addAction(new Notification.Action.Builder(icon, "FIX", pi).build())
+                    .setAutoCancel(true);
+            nm.notify(RECOVERY_NOTICE, b.build());
+        } catch (Exception ignored) {}
+    }
+
+    private void clearRecoveryNotification() {
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm != null) nm.cancel(RECOVERY_NOTICE);
+        } catch (Exception ignored) {}
+    }
+
     private void setInputTextVisible(boolean visible) {
         inputTextVisible = visible;
         if (visible) {
             if (bubble == null && !snoozed()) showBubble();
-        } else if (!sessionActive) {
-            hideBubble();
+        } else {
+            if (sessionActive && sensitiveFocused()) {
+                DictationController.get(this).cancel();
+            }
+            if (!sessionActive) hideBubble();
         }
+    }
+
+    private boolean sensitiveFocused() {
+        return new com.wahtuh.pho.data.Settings(this).blockSensitiveApps()
+                && SensitiveApps.blocks(InsertAccessibilityService.focusedPackage());
     }
 
     private boolean snoozed() {
@@ -464,6 +571,13 @@ public final class DictationService extends Service implements DictationListener
         DictationController c = DictationController.get(this);
         if (c.busy()) return;
         com.wahtuh.pho.data.Settings settings = new com.wahtuh.pho.data.Settings(this);
+        if (settings.blockSensitiveApps()
+                && SensitiveApps.blocks(InsertAccessibilityService.focusedPackage())) {
+            setBubble(PINK, "OFF");
+            Toast.makeText(this, "Dictation is off in this sensitive app",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
         String selection = settings.commandMode()
                 ? InsertAccessibilityService.selectedText(12000) : "";
         if (!selection.isEmpty() && c.commandReady()) {
@@ -498,6 +612,12 @@ public final class DictationService extends Service implements DictationListener
 
     private void toggle() {
         if (sessionCapped) return;
+        if (sensitiveFocused()) {
+            setBubble(PINK, "OFF");
+            Toast.makeText(this, "Dictation is off in this sensitive app",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
         DictationController c = DictationController.get(this);
         if (c.busy()) {
             c.stop();
@@ -516,6 +636,7 @@ public final class DictationService extends Service implements DictationListener
             sessionActive = true;
             sessionWarned = false;
             sessionCapped = false;
+            liveText = "";
             recordingStart = System.currentTimeMillis();
             main.removeCallbacks(ticker);
             main.post(ticker);
@@ -532,6 +653,7 @@ public final class DictationService extends Service implements DictationListener
         } else if (DictationController.TRANSCRIBING.equals(state)
                 || DictationController.PREPARING.equals(state)) {
             sessionActive = true;
+            liveText = "";
             stopTimer();
             setBubble(BUSY, "WORKING...");
             if (wave != null) {
@@ -545,6 +667,7 @@ public final class DictationService extends Service implements DictationListener
             sessionCapped = false;
             commandMode = false;
             commandSelection = "";
+            liveText = "";
             stopTimer();
             setBubble(BUSY, "RETRY");
             if (wave != null) {
@@ -559,6 +682,7 @@ public final class DictationService extends Service implements DictationListener
             sessionCapped = false;
             commandMode = false;
             commandSelection = "";
+            liveText = "";
             stopTimer();
             setBubble(CREAM, "");
             if (wave != null) {
@@ -735,6 +859,18 @@ public final class DictationService extends Service implements DictationListener
     }
 
     @Override
+    public void onPartial(String text) {
+        if (text == null) return;
+        if (!DictationController.RECORDING.equals(DictationController.get(this).state())) return;
+        String clean = text.trim();
+        if (clean.isEmpty()) return;
+        String tail = clean.length() > 22 ? "..." + clean.substring(clean.length() - 19) : clean;
+        liveText = tail;
+        setBubble(CREAM, tail);
+        updateNotification("Listening", clean);
+    }
+
+    @Override
     public void onResult(DictationResult result) {
         if (result == null) return;
         if (result.text.isEmpty() && !result.command) return;
@@ -862,6 +998,8 @@ public final class DictationService extends Service implements DictationListener
         cancelHold();
         stopTimer();
         main.removeCallbacks(wakeTask);
+        main.removeCallbacks(accessibilityWatch);
+        clearRecoveryNotification();
         hideSnoozeTarget();
         io.shutdownNow();
         DictationController.get(this).cancel();
@@ -887,6 +1025,7 @@ public final class DictationService extends Service implements DictationListener
         io.shutdownNow();
         stopTimer();
         main.removeCallbacks(wakeTask);
+        main.removeCallbacks(accessibilityWatch);
         hideSnoozeTarget();
         DictationController c = DictationController.get(this);
         if (c.busy()) c.cancel();

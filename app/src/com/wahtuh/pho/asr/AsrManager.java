@@ -18,6 +18,11 @@ public final class AsrManager {
 
     public synchronized void prepareModels() throws Exception {
         ModelInstaller.install(app);
+        try {
+            ModelInstaller.installStreaming(app);
+        } catch (Throwable ignored) {
+            // Live words are optional; batch dictation still works without them.
+        }
     }
 
     public boolean modelsReady() {
@@ -26,6 +31,10 @@ public final class AsrManager {
 
     public long modelBytes() {
         return ModelInstaller.installedBytes(app);
+    }
+
+    public boolean streamingReady() {
+        return ModelInstaller.streamingReady(app);
     }
 
     public synchronized AsrOutput transcribe(float[] pcm, String language) throws Exception {

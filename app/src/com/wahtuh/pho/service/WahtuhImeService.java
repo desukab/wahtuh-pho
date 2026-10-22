@@ -19,9 +19,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.wahtuh.pho.MainActivity;
+import com.wahtuh.pho.data.Settings;
 import com.wahtuh.pho.dictation.DictationController;
 import com.wahtuh.pho.dictation.DictationListener;
 import com.wahtuh.pho.dictation.DictationResult;
+import com.wahtuh.pho.text.SensitiveApps;
 import com.wahtuh.pho.ui.Ui;
 
 /** Voice-first keyboard. Every key is a normal key; dictation is one tap away. */
@@ -29,6 +31,7 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
     private LinearLayout root;
     private TextView status;
     private TextView preview;
+    private String composing = "";
     private Button mic;
     private LinearLayout keys;
     private boolean shifted;
@@ -64,7 +67,7 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.setPadding(Ui.dp(this, 10), 0, Ui.dp(this, 6), 0);
-        status = Ui.text(this, "On-device dictation", 12, Ui.MUTED, false);
+        status = Ui.text(this, dictationLabel(), 12, Ui.MUTED, false);
         preview = Ui.text(this, "", 12, Ui.TEXT, false);
         preview.setSingleLine(true);
         preview.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -175,18 +178,27 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
     private void enter() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
-        int options = getCurrentInputEditorInfo() == null ? 0 : getCurrentInputEditorInfo().imeOptions;
-        int action = options & InputType.TYPE_MASK_VARIATION;
-        if ((options & android.view.inputmethod.EditorInfo.IME_FLAG_NO_ENTER_ACTION) == 0
-                && ((options & android.view.inputmethod.EditorInfo.IME_MASK_ACTION)
-                != android.view.inputmethod.EditorInfo.IME_ACTION_NONE)) {
-            ic.performEditorAction(options & android.view.inputmethod.EditorInfo.IME_MASK_ACTION);
+        android.view.inputmethod.EditorInfo info = getCurrentInputEditorInfo();
+        int options = info == null ? 0 : info.imeOptions;
+        int action = options & android.view.inputmethod.EditorInfo.IME_MASK_ACTION;
+        boolean noEnterAction = (options
+                & android.view.inputmethod.EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0;
+        if (!noEnterAction
+                && action != android.view.inputmethod.EditorInfo.IME_ACTION_NONE
+                && action != android.view.inputmethod.EditorInfo.IME_ACTION_UNSPECIFIED) {
+            ic.performEditorAction(action);
         } else {
             ic.commitText("\n", 1);
         }
     }
 
     private void toggleDictation() {
+        if (blockedTarget()) {
+            status.setText("Sensitive field — dictation off");
+            Toast.makeText(this, "Dictation is off in banking, wallet, and password fields",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             status.setText("Microphone permission needed");
             Intent i = new Intent(this, MainActivity.class);
@@ -200,6 +212,31 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
         else c.start(this);
     }
 
+    private String dictationLabel() {
+        Settings settings = new Settings(this);
+        return settings.providerLabel() + " dictation";
+    }
+
+    private boolean blockedTarget() {
+        android.view.inputmethod.EditorInfo info = getCurrentInputEditorInfo();
+        if (info == null) return false;
+        if (passwordInput(info.inputType)) return true;
+        return new Settings(this).blockSensitiveApps()
+                && SensitiveApps.blocks(info.packageName);
+    }
+
+    private static boolean passwordInput(int type) {
+        int kind = type & InputType.TYPE_MASK_CLASS;
+        int variation = type & InputType.TYPE_MASK_VARIATION;
+        if (kind == InputType.TYPE_CLASS_TEXT) {
+            return variation == InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    || variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                    || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD;
+        }
+        return kind == InputType.TYPE_CLASS_NUMBER
+                && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD;
+    }
+
     private void openSettings() {
         Intent i = new Intent(this, MainActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -209,12 +246,19 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
     @Override
     public void onStartInputView(android.view.inputmethod.EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
-        if (status != null) status.setText("On-device dictation");
+        boolean blocked = blockedTarget();
+        if (status != null) status.setText(blocked
+                ? "Sensitive field — dictation off" : dictationLabel());
+        if (mic != null) {
+            mic.setEnabled(!blocked);
+            mic.setAlpha(blocked ? 0.4f : 1f);
+        }
         if (preview != null) preview.setText("");
     }
 
     @Override
     public void onFinishInputView(boolean finishingInput) {
+        clearComposing();
         DictationController c = DictationController.get(this);
         if (c.busy()) c.cancel();
         super.onFinishInputView(finishingInput);
@@ -225,17 +269,47 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
         if (status == null) return;
         status.setText(message == null ? state : message);
         if (DictationController.RECORDING.equals(state)) {
+            clearComposing();
+            if (preview != null) preview.setText("");
             mic.setText("Stop");
             mic.setBackground(Ui.rounded(Ui.DANGER, 14, this));
         } else if (DictationController.TRANSCRIBING.equals(state)
                 || DictationController.PREPARING.equals(state)) {
+            clearComposing();
+            if (preview != null) preview.setText("");
             mic.setText("...");
             mic.setBackground(Ui.rounded(Ui.ACCENT2, 14, this));
         } else {
+            clearComposing();
+            if (preview != null) preview.setText("");
             mic.setText("Dictate");
             mic.setBackground(Ui.rounded(Ui.ACCENT, 14, this));
             mic.setAlpha(1f);
         }
+    }
+
+    @Override
+    public void onPartial(String text) {
+        if (preview == null || text == null) return;
+        if (!DictationController.RECORDING.equals(DictationController.get(this).state())) return;
+        String clean = text.trim();
+        if (clean.isEmpty() || blockedTarget()) return;
+        preview.setText(clean);
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.setComposingText(clean, 1);
+            composing = clean;
+        }
+    }
+
+    private void clearComposing() {
+        if (composing.isEmpty()) return;
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.setComposingText("", 1);
+            ic.finishComposingText();
+        }
+        composing = "";
     }
 
     @Override
@@ -247,6 +321,15 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
     @Override
     public void onResult(DictationResult result) {
         if (result == null || result.text.isEmpty()) return;
+        if (blockedTarget()) {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", result.text));
+            if (status != null) status.setText("Sensitive field — copied instead");
+            Toast.makeText(this, "Sensitive field: text copied, not inserted",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        clearComposing();
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
             CharSequence before = ic.getTextBeforeCursor(1, 0);
@@ -264,6 +347,7 @@ public final class WahtuhImeService extends InputMethodService implements Dictat
 
     @Override
     public void onError(String message) {
+        clearComposing();
         if (status != null) status.setText(message);
         if (mic != null) {
             mic.setText("Dictate");

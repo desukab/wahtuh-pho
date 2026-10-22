@@ -13,5 +13,6 @@ members = [
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/desukab/wahtuh-pho"
-# NOTE: std-only. No external dependencies anywhere in this workspace, so the
-# build works fully offline and the binary stays lean for Android targets.
+# NOTE: the shipped Android app is built without Gradle and does not link these
+# crates. The research workspace uses whisper-rs for local inference; the
+# provider crate has no HTTP transport. See README.md for the app path.

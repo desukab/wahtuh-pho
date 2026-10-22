@@ -91,12 +91,9 @@ public final class Dictionary {
                 String s = line.trim();
                 if (s.isEmpty() || s.startsWith("#")) continue;
                 int at = s.indexOf('=');
-                if (at <= 0) continue;
-                String from = s.substring(0, at).trim();
-                String to = s.substring(at + 1).trim();
-                if (!from.isEmpty() && !from.equals(to)) {
-                    all.add(new Entry(from, to, false, ""));
-                }
+                String from = (at > 0 ? s.substring(0, at) : s).trim();
+                String to = at > 0 ? s.substring(at + 1).trim() : from;
+                if (!from.isEmpty()) all.add(new Entry(from, to, false, ""));
             }
         }
         return new Dictionary(base.version(), all);
@@ -124,7 +121,9 @@ public final class Dictionary {
             while (m.find()) {
                 out.append(text, last, m.start());
                 out.append(e.to);
-                edits.add(new Edit("dictionary", m.group(), e.to, m.start()));
+                if (!m.group().equals(e.to)) {
+                    edits.add(new Edit("dictionary", m.group(), e.to, m.start()));
+                }
                 last = m.end();
             }
             out.append(text.substring(last));
@@ -134,8 +133,11 @@ public final class Dictionary {
         while (true) {
             int at = text.indexOf(e.from, idx);
             if (at < 0) break;
+            String matched = text.substring(at, at + e.from.length());
             text = text.substring(0, at) + e.to + text.substring(at + e.from.length());
-            edits.add(new Edit("dictionary", e.from, e.to, at));
+            if (!matched.equals(e.to)) {
+                edits.add(new Edit("dictionary", matched, e.to, at));
+            }
             idx = at + e.to.length();
         }
         return text;

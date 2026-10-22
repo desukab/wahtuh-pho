@@ -43,7 +43,7 @@ public final class Snippets {
                 int at = s.indexOf('=');
                 if (at <= 0) continue;
                 String trigger = s.substring(0, at).trim();
-                String expansion = s.substring(at + 1).trim();
+                String expansion = unescape(s.substring(at + 1).trim());
                 if (!trigger.isEmpty() && !expansion.isEmpty()) {
                     list.add(new Entry(trigger, expansion));
                 }
@@ -53,6 +53,35 @@ public final class Snippets {
     }
 
     public List<Entry> entries() { return new ArrayList<>(entries); }
+
+    public static String escape(String value) {
+        if (value == null) return "";
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\\') out.append("\\\\");
+            else if (c == '\n') out.append("\\n");
+            else out.append(c);
+        }
+        return out.toString();
+    }
+
+    public static String unescape(String value) {
+        if (value == null || value.indexOf('\\') < 0) return value == null ? "" : value;
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\\' && i + 1 < value.length()) {
+                char next = value.charAt(++i);
+                if (next == 'n') out.append('\n');
+                else if (next == '\\') out.append('\\');
+                else out.append('\\').append(next);
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
 
     public Applied apply(String input) {
         String text = input == null ? "" : input;

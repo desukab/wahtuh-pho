@@ -1,7 +1,7 @@
 # Wahtuh Pho — Privacy
 
 **Date:** 2026-10-22 · **Status:** the first half describes the Rust core
-design; the Android section at the end describes the shipped v0.3.1 app.
+design; the Android section at the end describes the v0.3.2 app.
 
 **One line:** in the default mode, your voice never leaves your device and
 the project collects nothing. Cloud transcription exists only as an explicit
@@ -19,11 +19,12 @@ microphone → platform audio capture (Android AudioRecord, future)
          → wahtuh-core: session result + local transcript history (JSONL on device)
 ```
 
-No step in this path can reach the network: the workspace builds **std-only
-with no HTTP transport**, `wahtuh-providers` is depended on by no other crate,
-and `wahtuh-config` rejects any cloud configuration while `local_only = true`
-(the default). The local-only guarantee is structural (no code path), not just
-a flag.
+No step in this path can reach the network in the shipped app: the local
+engine path never constructs a cloud request, `wahtuh-providers` has no HTTP
+transport, and the app's single routing chokepoint refuses a cloud provider
+while local-only is on (the default). The research workspace uses
+`whisper-rs` for local inference; that is still an on-device engine, not a
+network path. The local-only guarantee is structural, not just a flag.
 
 **Opt-in cloud mode (user explicitly disables local-only and supplies a key):**
 
@@ -127,7 +128,7 @@ The shipped app defaults to **On-device (private)** with local-only mode **on**.
 
 ## Stays on device
 
-- Microphone audio and both raw and cleaned transcripts. Local ASR is Cactus Whistle; no audio leaves the device in on-device mode.
+- Microphone audio and both raw and cleaned transcripts. Local ASR is Cactus Whistle, local VAD is Silero v5 through ONNX Runtime, and the English live-preview stream runs locally through sherpa-onnx; no audio leaves the device in on-device mode.
 - `files/history.jsonl`, capped at 300 entries and subject to the KEEP / 24 HOURS / NEVER policy.
 - No new audio files are written. Any legacy `files/audio/<id>.wav` files are deleted by Clear, by NEVER, and by the 24-hour policy.
 - Dictionary text, text settings, and provider choice.
@@ -159,7 +160,9 @@ Requests include audio, model, language hint, and short vocabulary hints from yo
 
 ## Controls
 
-- **App-aware tone** reads the foreground package name only (for example, a chat or email app) to pick a punctuation preset. It never reads the field contents or screen.
+- **App-aware tone** reads the foreground package name only (for example, a chat or email app) to pick an email, workplace, chat, or other preset. It never reads the field contents or screen.
+- **Sensitive-app stand-down** uses the foreground package name only. Banking, payment, wallet, authenticator, and password-manager packages are refused by default in accessibility insertion and the IME. Password fields are always refused. Turning the package guard off does not relax the password guard.
+- **Insertion recovery** checks whether Android still has accessibility insertion enabled. If it is off, the app posts a local FIX notification; no data is collected or sent.
 - **Field Context** is a separate, off-by-default switch. When enabled, the app reads the focused field at stop time and sends only extracted names/code terms to AI polish. It is blocked unless AI polish is on, and refuses passwords and Wahtuh Pho's own fields.
 - **History retention** is KEEP, 24 HOURS, or NEVER. NEVER deletes `history.jsonl` and legacy audio and stops saving new entries.
 - **Clear transcript history** deletes `history.jsonl` and any legacy audio files.

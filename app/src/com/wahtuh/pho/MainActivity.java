@@ -38,7 +38,11 @@ import com.wahtuh.pho.data.Settings;
 import com.wahtuh.pho.service.DictationService;
 import com.wahtuh.pho.service.InsertAccessibilityService;
 import com.wahtuh.pho.text.Snippets;
+import com.wahtuh.pho.text.TextPipeline;
 import com.wahtuh.pho.ui.Ui;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -49,6 +53,7 @@ import java.util.Locale;
 public final class MainActivity extends android.app.Activity {
     private static final int REQ_MIC = 10;
     private static final int REQ_NOTIF = 11;
+    private static final String APP_VERSION = "0.3.2";
 
     private Settings settings;
     private SecureStore secure;
@@ -430,6 +435,156 @@ public final class MainActivity extends android.app.Activity {
         }
     }
 
+    private void showRun(HistoryEntry entry) {
+        LinearLayout box = dialogBox();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 8));
+        scroll.addView(list, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        box.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 430)));
+
+        boolean cloudAudio = entry.provider != null && !entry.provider.isEmpty()
+                && !Settings.LOCAL.equals(entry.provider)
+                && !entry.provider.startsWith("command:local");
+        boolean cloudText = entry.engine != null
+                && (entry.engine.startsWith("command:groq")
+                || entry.engine.startsWith("command:openai")
+                || entry.engine.startsWith("command:gemini")
+                || entry.engine.startsWith("command:deepgram"));
+        boolean cloud = cloudAudio || cloudText;
+        String route = cloudAudio ? "CLOUD ASR"
+                : cloudText ? "LOCAL ASR + CLOUD TEXT" : "ON-DEVICE";
+        String audio = cloudAudio
+                ? "AUDIO SENT TO " + safe(entry.provider) + "  ·  PROVIDER RETENTION APPLIES"
+                : cloudText ? "AUDIO ON DEVICE  ·  TEXT SENT FOR REWRITE"
+                : "AUDIO STAYED ON DEVICE  ·  NOT SAVED";
+        LinearLayout receipt = new LinearLayout(this);
+        receipt.setOrientation(LinearLayout.VERTICAL);
+        receipt.setBackground(Ui.panel(Ui.SURFACE2, cloud ? Ui.MAGENTA : Ui.ACCENT, this));
+        receipt.setPadding(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 10));
+        receipt.addView(Ui.pixel(this, "RUN RECEIPT", 8, cloud ? Ui.MAGENTA : Ui.ACCENT));
+        receipt.addView(Ui.body(this, route + "  ·  " + providerName(entry.provider)
+                + "  ·  " + safe(entry.engine), 16, Ui.TEXT));
+        receipt.addView(Ui.body(this, audio, 14, Ui.MUTED));
+        list.addView(receipt);
+
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        stats.setPadding(0, Ui.dp(this, 10), 0, 0);
+        stats.addView(runStat("SPOKEN", seconds(entry.durationMs)));
+        stats.addView(runStat("LATENCY", entry.latencyMs + " ms"));
+        stats.addView(runStat("LANGUAGE", languageLabel(entry.language)));
+        list.addView(stats);
+
+        sectionLabel(list, "CLEANED OUTPUT", Ui.ACCENT);
+        list.addView(selectable(entry.text, Ui.TEXT));
+
+        if (entry.raw != null && !entry.raw.isEmpty()
+                && !entry.raw.trim().equals(entry.text == null ? "" : entry.text.trim())) {
+            sectionLabel(list, "RAW TRANSCRIPT", Ui.MUTED);
+            list.addView(selectable(entry.raw, Ui.MUTED));
+        }
+
+        String edits = describeEdits(entry.editsJson);
+        if (!edits.isEmpty()) {
+            sectionLabel(list, "PIPELINE EDITS", Ui.ACCENT2);
+            list.addView(selectable(edits, Ui.TEXT));
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("RUN  //  " + HistoryStore.formatTime(entry.createdAt))
+                .setView(box)
+                .setNegativeButton("CLOSE", null)
+                .setNeutralButton("COPY RAW", (d, w) -> copy(entry.raw))
+                .setPositiveButton("COPY CLEAN", (d, w) -> copy(entry.text))
+                .create();
+
+        TextView delete = Ui.pixel(this, "DELETE THIS RUN", 8, Ui.DANGER);
+        delete.setPadding(0, Ui.dp(this, 20), 0, Ui.dp(this, 6));
+        delete.setOnClickListener(v -> {
+            new HistoryStore(this).remove(entry.id);
+            dialog.dismiss();
+            render();
+        });
+        list.addView(delete);
+        dialog.show();
+    }
+
+    private View runStat(String label, String value) {
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setPadding(0, 0, Ui.dp(this, 18), 0);
+        column.addView(Ui.pixel(this, label, 6, Ui.MUTED));
+        TextView number = Ui.body(this, value, 18, Ui.TEXT);
+        number.setPadding(0, Ui.dp(this, 3), 0, 0);
+        column.addView(number);
+        return column;
+    }
+
+    private void sectionLabel(LinearLayout list, String label, int color) {
+        TextView title = Ui.pixel(this, label, 8, color);
+        title.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 5));
+        list.addView(title);
+    }
+
+    private TextView selectable(String value, int color) {
+        TextView text = Ui.body(this, value == null ? "" : value, 18, color);
+        text.setTextIsSelectable(true);
+        return text;
+    }
+
+    private static String seconds(long ms) {
+        long seconds = Math.max(0, Math.round(ms / 1000.0));
+        return String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60);
+    }
+
+    private static String languageLabel(String code) {
+        if (code == null || code.isEmpty()) return "AUTO";
+        return Settings.languageLabel(code).toUpperCase(Locale.US);
+    }
+
+    private static String safe(String value) {
+        return value == null || value.trim().isEmpty() ? "unknown" : value.toUpperCase(Locale.US);
+    }
+
+    private static String describeEdits(String json) {
+        if (json == null || json.trim().isEmpty()) return "";
+        try {
+            JSONArray arr = new JSONArray(json);
+            if (arr.length() == 0) return "";
+            StringBuilder out = new StringBuilder();
+            int shown = 0;
+            for (int i = 0; i < arr.length() && shown < 12; i++) {
+                JSONObject edit = arr.optJSONObject(i);
+                if (edit == null) continue;
+                String rule = edit.optString("rule", "edit");
+                String from = edit.optString("from", "");
+                String to = edit.optString("to", "");
+                if (out.length() > 0) out.append('\n');
+                out.append(rule.toUpperCase(Locale.US)).append("  ")
+                        .append(quote(from)).append("  ->  ")
+                        .append(to.isEmpty() ? "(removed)" : quote(to));
+                shown++;
+            }
+            if (arr.length() > shown) {
+                out.append('\n').append("+ ").append(arr.length() - shown).append(" more");
+            }
+            return out.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static String quote(String value) {
+        if (value == null || value.isEmpty()) return "(empty)";
+        String compact = value.replace("\n", "\\n");
+        return "\"" + (compact.length() > 48 ? compact.substring(0, 48) + "..." : compact) + "\"";
+    }
+
     private View historyCard(HistoryEntry entry) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -439,7 +594,8 @@ public final class MainActivity extends android.app.Activity {
 
         String time = new SimpleDateFormat("HH:mm", Locale.getDefault())
                 .format(new Date(entry.createdAt));
-        TextView meta = Ui.pixel(this, time + "  //  " + providerName(entry.provider), 7, Ui.MUTED);
+        TextView meta = Ui.pixel(this, time + "  //  " + providerName(entry.provider)
+                + (entry.cleaned ? "  //  CLEANED" : ""), 7, Ui.MUTED);
         card.addView(meta);
 
         TextView text = Ui.body(this, entry.text, 19, Ui.TEXT);
@@ -451,6 +607,10 @@ public final class MainActivity extends android.app.Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.setPadding(0, Ui.dp(this, 8), 0, 0);
+        TextView inspect = Ui.pixel(this, "INSPECT", 8, Ui.ACCENT2);
+        inspect.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 18), Ui.dp(this, 6));
+        inspect.setOnClickListener(v -> showRun(entry));
+        actions.addView(inspect);
         TextView copy = Ui.pixel(this, "COPY", 8, Ui.ACCENT);
         copy.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 18), Ui.dp(this, 6));
         copy.setOnClickListener(v -> copy(entry.text));
@@ -460,6 +620,7 @@ public final class MainActivity extends android.app.Activity {
         del.setOnClickListener(v -> confirmDelete(entry));
         actions.addView(del);
         card.addView(actions);
+        card.setOnClickListener(v -> showRun(entry));
         return card;
     }
 
@@ -487,22 +648,43 @@ public final class MainActivity extends android.app.Activity {
         toggle.addView(use);
         list.addView(toggle);
 
+        EditText search = input("Search dictionary", false);
+        list.addView(search, top(12));
         TextView add = Ui.action(this, "+ ADD WORD", Ui.ACCENT, Ui.MAGENTA, Ui.INK);
-        add.setOnClickListener(v -> addWordDialog());
-        list.addView(add, top(14));
+        add.setOnClickListener(v -> wordDialog(null));
+        list.addView(add, top(12));
 
-        List<String> entries = dictionaryEntries();
-        if (entries.isEmpty()) {
-            list.addView(emptyCard("EMPTY SLOT", "Add a name, product, or place."), top(14));
-        } else {
-            for (int i = 0; i < entries.size(); i++) {
-                list.addView(wordCard(entries.get(i), i), top(8));
+        LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        list.addView(results);
+        renderWords(results, "");
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+                renderWords(results, s.toString());
             }
-        }
+            @Override public void afterTextChanged(android.text.Editable s) {}
+        });
         return scroll;
     }
 
-    private View wordCard(String line, int index) {
+    private void renderWords(LinearLayout results, String query) {
+        results.removeAllViews();
+        String q = query.trim().toLowerCase(Locale.US);
+        int shown = 0;
+        for (String line : dictionaryEntries()) {
+            if (!q.isEmpty() && !line.toLowerCase(Locale.US).contains(q)) continue;
+            results.addView(wordCard(line), top(8));
+            shown++;
+        }
+        if (shown == 0) {
+            results.addView(emptyCard(q.isEmpty() ? "EMPTY SLOT" : "NO MATCH",
+                    q.isEmpty() ? "Add a name, product, or place." : "Try another search."),
+                    top(8));
+        }
+    }
+
+    private View wordCard(String line) {
         String from = line;
         String to = "";
         int at = line.indexOf('=');
@@ -525,32 +707,67 @@ public final class MainActivity extends android.app.Activity {
         }
         card.addView(text, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView edit = Ui.pixel(this, "EDIT", 8, Ui.ACCENT2);
+        edit.setPadding(Ui.dp(this, 10), Ui.dp(this, 8), Ui.dp(this, 10), Ui.dp(this, 8));
+        edit.setOnClickListener(v -> wordDialog(line));
+        card.addView(edit);
         TextView del = Ui.pixel(this, "X", 11, Ui.DANGER);
-        del.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8));
+        del.setPadding(Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8));
         del.setOnClickListener(v -> {
             List<String> all = dictionaryEntries();
-            if (index >= 0 && index < all.size()) {
-                all.remove(index);
-                settings.setUserDictionary(join(all));
-                render();
-            }
+            all.remove(line);
+            settings.setUserDictionary(join(all));
+            render();
         });
         card.addView(del);
         return card;
     }
 
-    private void addWordDialog() {
+    private void wordDialog(String existing) {
+        String oldKey = "";
+        String oldValue = "";
+        if (existing != null) {
+            int at = existing.indexOf('=');
+            oldKey = at > 0 ? existing.substring(0, at).trim() : existing;
+            oldValue = at > 0 ? existing.substring(at + 1).trim() : "";
+        }
         LinearLayout box = dialogBox();
         EditText from = input("Word or name", false);
         EditText to = input("Replace with (optional)", false);
+        from.setText(oldKey);
+        to.setText(oldValue);
         box.addView(from);
         box.addView(to, top(10));
-        AlertDialog dialog = dialog("ADD WORD", box, "SAVE", () -> {
+        AlertDialog dialog = dialog(existing == null ? "ADD WORD" : "EDIT WORD",
+                box, "SAVE", () -> {
             String key = from.getText().toString().trim();
             String value = to.getText().toString().trim();
-            if (key.isEmpty()) return;
+            if (key.isEmpty() || key.contains("=")) {
+                Toast.makeText(this, "Add a word without =", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (key.length() > 60 || value.length() > 120) {
+                Toast.makeText(this, "Keep the word under 60 and replacement under 120",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
             List<String> entries = dictionaryEntries();
-            entries.add(key + (value.isEmpty() ? "" : "=" + value));
+            for (String line : entries) {
+                int at = line.indexOf('=');
+                String seen = at > 0 ? line.substring(0, at).trim() : line;
+                if (seen.equalsIgnoreCase(key) && (existing == null || !line.equals(existing))) {
+                    Toast.makeText(this, "Already in the dictionary", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+            String line = key + (value.isEmpty() ? "" : "=" + value);
+            if (existing == null) {
+                entries.add(line);
+            } else {
+                int at = entries.indexOf(existing);
+                if (at >= 0) entries.set(at, line);
+                else entries.add(line);
+            }
             settings.setUserDictionary(join(entries));
             render();
         });
@@ -563,19 +780,41 @@ public final class MainActivity extends android.app.Activity {
         LinearLayout list = body(scroll);
         header(list, "ITEMS", "SNIPPETS", "Short triggers that expand into full text.");
 
+        EditText search = input("Search snippets", false);
+        list.addView(search);
         TextView add = Ui.action(this, "+ ADD SNIPPET", Ui.ACCENT, Ui.MAGENTA, Ui.INK);
-        add.setOnClickListener(v -> addSnippetDialog());
-        list.addView(add);
+        add.setOnClickListener(v -> snippetDialog(null));
+        list.addView(add, top(12));
 
-        Snippets snippets = Snippets.parse(settings.snippets());
-        if (snippets.entries().isEmpty()) {
-            list.addView(emptyCard("EMPTY SLOT", "Try: my email=you@example.com"), top(14));
-        } else {
-            for (Snippets.Entry entry : snippets.entries()) {
-                list.addView(snippetCard(entry), top(8));
+        LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        list.addView(results);
+        renderSnippets(results, "");
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+                renderSnippets(results, s.toString());
             }
-        }
+            @Override public void afterTextChanged(android.text.Editable s) {}
+        });
         return scroll;
+    }
+
+    private void renderSnippets(LinearLayout results, String query) {
+        results.removeAllViews();
+        String q = query.trim().toLowerCase(Locale.US);
+        int shown = 0;
+        for (Snippets.Entry entry : snippetsList()) {
+            String haystack = (entry.trigger + "\n" + entry.expansion).toLowerCase(Locale.US);
+            if (!q.isEmpty() && !haystack.contains(q)) continue;
+            results.addView(snippetCard(entry), top(8));
+            shown++;
+        }
+        if (shown == 0) {
+            results.addView(emptyCard(q.isEmpty() ? "EMPTY SLOT" : "NO MATCH",
+                    q.isEmpty() ? "Try: my email=you@example.com" : "Try another search."),
+                    top(8));
+        }
     }
 
     private View snippetCard(Snippets.Entry entry) {
@@ -587,8 +826,12 @@ public final class MainActivity extends android.app.Activity {
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(Ui.pixel(this, entry.trigger.toUpperCase(Locale.getDefault()), 9, Ui.ACCENT),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView edit = Ui.pixel(this, "EDIT", 8, Ui.ACCENT2);
+        edit.setPadding(Ui.dp(this, 10), Ui.dp(this, 6), Ui.dp(this, 10), Ui.dp(this, 6));
+        edit.setOnClickListener(v -> snippetDialog(entry));
+        top.addView(edit);
         TextView del = Ui.pixel(this, "X", 11, Ui.DANGER);
-        del.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 6));
+        del.setPadding(Ui.dp(this, 6), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 6));
         del.setOnClickListener(v -> {
             List<Snippets.Entry> all = snippetsList();
             for (int i = 0; i < all.size(); i++) {
@@ -609,18 +852,49 @@ public final class MainActivity extends android.app.Activity {
         return card;
     }
 
-    private void addSnippetDialog() {
+    private void snippetDialog(Snippets.Entry existing) {
         LinearLayout box = dialogBox();
         EditText trigger = input("Trigger", false);
         EditText expansion = input("Full text", true);
+        if (existing != null) {
+            trigger.setText(existing.trigger);
+            expansion.setText(existing.expansion);
+        }
         box.addView(trigger);
         box.addView(expansion, top(10));
-        dialog("ADD SNIPPET", box, "SAVE", () -> {
+        dialog(existing == null ? "ADD SNIPPET" : "EDIT SNIPPET", box, "SAVE", () -> {
             String key = trigger.getText().toString().trim();
             String value = expansion.getText().toString().trim();
-            if (key.isEmpty() || value.isEmpty()) return;
+            if (key.isEmpty() || value.isEmpty() || key.contains("=")) {
+                Toast.makeText(this, "Add a trigger without = and some text",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (key.length() > 40 || value.length() > 2000) {
+                Toast.makeText(this, "Keep the trigger under 40 and text under 2000",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
             List<Snippets.Entry> all = snippetsList();
-            all.add(new Snippets.Entry(key, value));
+            for (Snippets.Entry seen : all) {
+                if (seen.trigger.equalsIgnoreCase(key)
+                        && (existing == null || !seen.trigger.equals(existing.trigger)
+                        || !seen.expansion.equals(existing.expansion))) {
+                    Toast.makeText(this, "That trigger already exists", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+            if (existing == null) {
+                all.add(new Snippets.Entry(key, value));
+            } else {
+                for (int i = 0; i < all.size(); i++) {
+                    if (all.get(i).trigger.equals(existing.trigger)
+                            && all.get(i).expansion.equals(existing.expansion)) {
+                        all.set(i, new Snippets.Entry(key, value));
+                        break;
+                    }
+                }
+            }
             settings.setSnippets(joinSnippets(all));
             render();
         }).show();
@@ -637,13 +911,56 @@ public final class MainActivity extends android.app.Activity {
         list.addView(styleCard(Settings.STYLE_EXCITED, "EXCITED!", "Upbeat and loud!"));
         if (settings.appTone()) {
             TextView note = Ui.body(this,
-                    "APP-AWARE TONE is on: with DEFAULT selected, chat apps drop the final period "
-                            + "and email stays formal. It uses only the app package name.",
+                    "APP-AWARE TONE uses only the app package name. AUTO keeps email formal "
+                            + "and chat casual; tap a category to cycle its override.",
                     16, Ui.MUTED);
             note.setPadding(0, Ui.dp(this, 14), 0, Ui.dp(this, 4));
             list.addView(note);
+            list.addView(categoryStyleRow("email", "EMAIL"), top(8));
+            list.addView(categoryStyleRow("work", "WORKPLACE"), top(8));
+            list.addView(categoryStyleRow("chat", "CHAT"), top(8));
+            list.addView(categoryStyleRow("other", "OTHER APPS"), top(8));
         }
         return scroll;
+    }
+
+    private View categoryStyleRow(String category, String label) {
+        String value = settings.styleForCategory(category);
+        boolean auto = Settings.STYLE_AUTO.equals(value);
+        String effective = auto ? TextPipeline.defaultStyleForCategory(category) : value;
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setBackground(Ui.panel(Ui.SURFACE, Ui.LINE, this));
+        card.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
+        LinearLayout text = new LinearLayout(this);
+        text.setOrientation(LinearLayout.VERTICAL);
+        text.addView(Ui.pixel(this, label, 9, Ui.ACCENT));
+        text.addView(Ui.body(this, (auto ? "AUTO · " : "") + styleLabel(effective),
+                18, auto ? Ui.MUTED : Ui.TEXT));
+        card.addView(text, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        card.addView(Ui.pixel(this, "CYCLE", 8, Ui.ACCENT2));
+        card.setOnClickListener(v -> {
+            String[] order = {Settings.STYLE_AUTO, Settings.STYLE_DEFAULT,
+                    Settings.STYLE_FORMAL, Settings.STYLE_CASUAL,
+                    Settings.STYLE_VERY_CASUAL, Settings.STYLE_EXCITED};
+            int at = 0;
+            for (int i = 0; i < order.length; i++) {
+                if (order[i].equals(value)) { at = i; break; }
+            }
+            settings.setStyleForCategory(category, order[(at + 1) % order.length]);
+            render();
+        });
+        return card;
+    }
+
+    private static String styleLabel(String value) {
+        if (Settings.STYLE_FORMAL.equals(value)) return "FORMAL";
+        if (Settings.STYLE_CASUAL.equals(value)) return "CASUAL";
+        if (Settings.STYLE_VERY_CASUAL.equals(value)) return "VERY CASUAL";
+        if (Settings.STYLE_EXCITED.equals(value)) return "EXCITED";
+        return "DEFAULT";
     }
 
     private View styleCard(String value, String label, String sample) {
@@ -726,6 +1043,52 @@ public final class MainActivity extends android.app.Activity {
         });
         privacy.addView(local);
         list.addView(privacy, top(6));
+
+        LinearLayout liveWords = new LinearLayout(this);
+        liveWords.setGravity(Gravity.CENTER_VERTICAL);
+        liveWords.setBackground(Ui.panel(Ui.SURFACE, Ui.LINE, this));
+        liveWords.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 14), Ui.dp(this, 10));
+        LinearLayout liveText = new LinearLayout(this);
+        liveText.setOrientation(LinearLayout.VERTICAL);
+        liveText.addView(Ui.pixel(this, "LIVE WORDS", 9, Ui.TEXT));
+        liveText.addView(Ui.body(this, "See English words while you speak", 16, Ui.MUTED));
+        liveWords.addView(liveText, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Switch liveSwitch = new Switch(this);
+        liveSwitch.setChecked(settings.streamingPreview());
+        liveSwitch.setThumbTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        liveSwitch.setTrackTintList(android.content.res.ColorStateList.valueOf(Ui.LINE));
+        liveSwitch.setOnCheckedChangeListener((b, checked) -> {
+            if (refreshing) return;
+            settings.setStreamingPreview(checked);
+        });
+        liveWords.addView(liveSwitch);
+        list.addView(liveWords, top(6));
+
+        LinearLayout sensitive = new LinearLayout(this);
+        sensitive.setGravity(Gravity.CENTER_VERTICAL);
+        sensitive.setBackground(Ui.panel(Ui.SURFACE, Ui.LINE, this));
+        sensitive.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 14), Ui.dp(this, 10));
+        LinearLayout sensitiveText = new LinearLayout(this);
+        sensitiveText.setOrientation(LinearLayout.VERTICAL);
+        sensitiveText.addView(Ui.pixel(this, "SENSITIVE APPS", 9, Ui.TEXT));
+        sensitiveText.addView(Ui.body(this,
+                "Banking, wallets, password managers", 16, Ui.MUTED));
+        sensitive.addView(sensitiveText, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Switch blockSensitive = new Switch(this);
+        blockSensitive.setChecked(settings.blockSensitiveApps());
+        blockSensitive.setThumbTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        blockSensitive.setTrackTintList(android.content.res.ColorStateList.valueOf(Ui.LINE));
+        blockSensitive.setOnCheckedChangeListener((b, checked) -> {
+            if (refreshing) return;
+            settings.setBlockSensitiveApps(checked);
+            InsertAccessibilityService.refreshBubbleVisibility();
+            Toast.makeText(this, checked ? "Sensitive-app stand-down on"
+                    : "Sensitive-app stand-down off", Toast.LENGTH_SHORT).show();
+        });
+        sensitive.addView(blockSensitive);
+        list.addView(sensitive, top(6));
 
         section(list, "SETUP");
         list.addView(permissionRow("MICROPHONE", micGranted(), "FIX", this::ensureMic), top(6));
@@ -906,7 +1269,7 @@ public final class MainActivity extends android.app.Activity {
         list.addView(bubbleBox, top(6));
 
         section(list, "ABOUT");
-        TextView version = Ui.body(this, "Wahtuh Pho 0.3.0  ·  local first",
+        TextView version = Ui.body(this, "Wahtuh Pho " + APP_VERSION + "  ·  local first",
                 17, Ui.MUTED);
         list.addView(version);
         TextView source = Ui.pixel(this, "SOURCE CODE >", 9, Ui.ACCENT2);
@@ -1191,7 +1554,8 @@ public final class MainActivity extends android.app.Activity {
         View spacer = new View(this);
         panel.addView(spacer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-        panel.addView(Ui.body(this, "v0.3.0  ·  local first  ·  insert coin", 16, Ui.MUTED));
+        panel.addView(Ui.body(this, "v" + APP_VERSION + "  ·  local first  ·  insert coin",
+                16, Ui.MUTED));
 
         panel.setTranslationX(-width);
         overlay.setAlpha(0f);
@@ -1375,7 +1739,7 @@ public final class MainActivity extends android.app.Activity {
     }
 
     private static String providerName(String provider) {
-        if (provider == null) return "LOCAL";
+        if (provider == null || provider.trim().isEmpty()) return "LOCAL";
         if (provider.startsWith("cloud:")) return provider.substring(6).toUpperCase(Locale.US);
         if (Settings.LOCAL.equals(provider)) return "LOCAL";
         return provider.toUpperCase(Locale.US);
@@ -1418,14 +1782,14 @@ public final class MainActivity extends android.app.Activity {
         StringBuilder out = new StringBuilder();
         for (Snippets.Entry entry : entries) {
             if (out.length() > 0) out.append('\n');
-            out.append(entry.trigger).append('=').append(entry.expansion.replace('\n', ' '));
+            out.append(entry.trigger).append('=').append(Snippets.escape(entry.expansion));
         }
         return out.toString();
     }
 
     private void copy(String text) {
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", text));
+        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", text == null ? "" : text));
         Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show();
     }
 

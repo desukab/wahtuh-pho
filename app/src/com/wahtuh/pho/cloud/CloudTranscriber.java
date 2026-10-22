@@ -451,9 +451,10 @@ public final class CloudTranscriber {
         StringBuilder sb = new StringBuilder("Vocabulary: ");
         int n = 0;
         for (String line : userDictionary.split("\n")) {
-            int at = line.indexOf('=');
-            if (at <= 0) continue;
-            String to = line.substring(at + 1).trim();
+            String entry = line.trim();
+            if (entry.isEmpty() || entry.startsWith("#")) continue;
+            int at = entry.indexOf('=');
+            String to = (at > 0 ? entry.substring(at + 1) : entry).trim();
             if (to.isEmpty()) continue;
             if (n++ > 24) break;
             sb.append(to).append(", ");

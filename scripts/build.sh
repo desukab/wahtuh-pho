@@ -8,8 +8,10 @@ APP="$ROOT/app"
 ANDROID_JAR="${ANDROID_JAR:-$HOME/asdk/android-35/android.jar}"
 VENDOR="${WAHTUH_VENDOR:-$ROOT/vendor}"
 D8_JAR="${D8_JAR:-$VENDOR/d8.jar}"
-VERSION_CODE="${VERSION_CODE:-4}"
-VERSION_NAME="${VERSION_NAME:-0.3.1}"
+ORT="${WAHTUH_ORT:-$VENDOR/onnxruntime}"
+SHERPA="${WAHTUH_SHERPA:-$VENDOR/sherpa-onnx}"
+VERSION_CODE="${VERSION_CODE:-5}"
+VERSION_NAME="${VERSION_NAME:-0.3.2}"
 ABI="${ABI:-arm64-v8a}"
 
 [ -f "$ANDROID_JAR" ] || { echo "Missing $ANDROID_JAR" >&2; exit 1; }
@@ -22,6 +24,24 @@ ABI="${ABI:-arm64-v8a}"
   echo "Native Whistle library missing. Run scripts/build-native.sh first." >&2
   exit 1
 }
+[ -f "$ORT/classes.jar" ] && [ -f "$ORT/$ABI/libonnxruntime.so" ] || {
+  echo "ONNX Runtime missing. Run scripts/fetch-deps.sh first." >&2
+  exit 1
+}
+[ -f "$APP/assets/models/silero_vad.onnx" ] || {
+  echo "Silero VAD model missing. Run scripts/fetch-models.sh first." >&2
+  exit 1
+}
+[ -f "$SHERPA/classes.jar" ] && [ -f "$SHERPA/$ABI/libsherpa-onnx-jni.so" ] || {
+  echo "sherpa-onnx missing. Run scripts/fetch-deps.sh first." >&2
+  exit 1
+}
+for f in encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt; do
+  [ -f "$APP/assets/models/streaming/$f" ] || {
+    echo "Streaming model missing ($f). Run scripts/fetch-models.sh first." >&2
+    exit 1
+  }
+done
 
 echo "==> clean"
 rm -rf "$BUILD"
@@ -29,6 +49,8 @@ mkdir -p "$BUILD/gen" "$BUILD/classes" "$BUILD/pkg/lib/$ABI"
 
 echo "==> native libraries"
 cp "$APP/jniLibs/$ABI/"*.so "$BUILD/pkg/lib/$ABI/"
+cp "$ORT/$ABI/"*.so "$BUILD/pkg/lib/$ABI/"
+cp "$SHERPA/$ABI/"*.so "$BUILD/pkg/lib/$ABI/"
 
 echo "==> compile resources"
 aapt2 compile --dir "$APP/res" -o "$BUILD/res.zip"
@@ -47,14 +69,15 @@ aapt2 link -o "$BUILD/base.apk" \
 echo "==> compile java"
 find "$APP/src" "$BUILD/gen" -name '*.java' > "$BUILD/sources.txt"
 javac -nowarn -Xlint:-options -source 8 -target 8 \
-  -classpath "$ANDROID_JAR" \
+  -classpath "$ANDROID_JAR:$ORT/classes.jar:$SHERPA/classes.jar" \
   -d "$BUILD/classes" @"$BUILD/sources.txt"
 
 echo "==> dex"
 ( cd "$BUILD/classes" && jar cf "$BUILD/app-classes.jar" . )
 rm -f "$BUILD/pkg/classes.dex"
 java -cp "$D8_JAR" com.android.tools.r8.D8 --release --min-api 26 \
-  --lib "$ANDROID_JAR" --output "$BUILD/pkg" "$BUILD/app-classes.jar"
+  --lib "$ANDROID_JAR" --output "$BUILD/pkg" \
+  "$BUILD/app-classes.jar" "$ORT/classes.jar" "$SHERPA/classes.jar"
 
 echo "==> package"
 cp "$BUILD/base.apk" "$BUILD/unsigned.apk"

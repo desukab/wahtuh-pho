@@ -21,56 +21,70 @@ import java.util.Locale;
 public final class HistoryStore {
     private static final int MAX = 300;
     private static final long DAY_MS = 24 * 60 * 60 * 1000L;
+    private static final Object LOCK = new Object();
 
     private final File file;
     private final File audioDir;
-    private final String retention;
+    private final Settings settings;
 
     public HistoryStore(Context context) {
         this.file = new File(context.getFilesDir(), "history.jsonl");
         this.audioDir = new File(context.getFilesDir(), "audio");
-        this.retention = new Settings(context).retention();
+        this.settings = new Settings(context);
     }
 
-    public synchronized void append(HistoryEntry e) {
-        if (Settings.RETENTION_NEVER.equals(retention)) {
-            purgeAll();
-            return;
+    private String retention() {
+        return settings.retention();
+    }
+
+    public void append(HistoryEntry e) {
+        synchronized (LOCK) {
+            if (Settings.RETENTION_NEVER.equals(retention())) {
+                purgeAll();
+                return;
+            }
+            pruneForPolicy();
+            try (FileOutputStream out = new FileOutputStream(file, true)) {
+                out.write((e.toJson().toString() + "\n").getBytes(StandardCharsets.UTF_8));
+                out.getFD().sync();
+            } catch (Exception ignored) {}
+            trim();
         }
-        pruneForPolicy();
-        try (FileOutputStream out = new FileOutputStream(file, true)) {
-            out.write((e.toJson().toString() + "\n").getBytes(StandardCharsets.UTF_8));
-        } catch (Exception ignored) {}
-        trim();
     }
 
-    public synchronized List<HistoryEntry> list() {
-        if (Settings.RETENTION_NEVER.equals(retention)) {
-            purgeAll();
-            return new ArrayList<>();
+    public List<HistoryEntry> list() {
+        synchronized (LOCK) {
+            if (Settings.RETENTION_NEVER.equals(retention())) {
+                purgeAll();
+                return new ArrayList<>();
+            }
+            pruneForPolicy();
+            List<HistoryEntry> out = readAll();
+            Collections.reverse(out);
+            return out;
         }
-        pruneForPolicy();
-        List<HistoryEntry> out = readAll();
-        Collections.reverse(out);
-        return out;
     }
 
-    public synchronized void clear() {
-        //noinspection ResultOfMethodCallIgnored
-        file.delete();
-        deleteAudio(0);
-    }
-
-    public synchronized void remove(String id) {
-        List<HistoryEntry> all = readAll();
-        List<HistoryEntry> keep = new ArrayList<>();
-        for (HistoryEntry e : all) {
-            if (e.id == null || !e.id.equals(id)) keep.add(e);
-        }
-        writeAll(keep);
-        if (id != null) {
+    public void clear() {
+        synchronized (LOCK) {
             //noinspection ResultOfMethodCallIgnored
-            new File(audioDir, id + ".wav").delete();
+            file.delete();
+            deleteAudio(0);
+        }
+    }
+
+    public void remove(String id) {
+        synchronized (LOCK) {
+            List<HistoryEntry> all = readAll();
+            List<HistoryEntry> keep = new ArrayList<>();
+            for (HistoryEntry e : all) {
+                if (e.id == null || !e.id.equals(id)) keep.add(e);
+            }
+            writeAll(keep);
+            if (id != null) {
+                //noinspection ResultOfMethodCallIgnored
+                new File(audioDir, id + ".wav").delete();
+            }
         }
     }
 
@@ -85,14 +99,17 @@ public final class HistoryStore {
     }
 
     private void pruneForPolicy() {
-        if (Settings.RETENTION_NEVER.equals(retention)) {
+        if (Settings.RETENTION_NEVER.equals(retention())) {
             purgeAll();
             return;
         }
-        if (!Settings.RETENTION_24H.equals(retention)) return;
+        if (!Settings.RETENTION_24H.equals(retention())) return;
         long cutoff = System.currentTimeMillis() - DAY_MS;
         List<HistoryEntry> all = readAll();
-        if (all.isEmpty()) return;
+        if (all.isEmpty()) {
+            deleteAudio(cutoff);
+            return;
+        }
         List<HistoryEntry> keep = new ArrayList<>();
         for (HistoryEntry e : all) {
             if (e.createdAt >= cutoff) keep.add(e);
@@ -115,11 +132,26 @@ public final class HistoryStore {
     }
 
     private void writeAll(List<HistoryEntry> entries) {
-        try (FileOutputStream out = new FileOutputStream(file, false)) {
+        File tmp = new File(file.getParentFile(), "history.jsonl.tmp");
+        try (FileOutputStream out = new FileOutputStream(tmp, false)) {
             for (HistoryEntry e : entries) {
                 out.write((e.toJson().toString() + "\n").getBytes(StandardCharsets.UTF_8));
             }
-        } catch (Exception ignored) {}
+            out.getFD().sync();
+        } catch (Exception ignored) {
+            tmp.delete();
+            return;
+        }
+        if (tmp.renameTo(file)) return;
+        try (FileInputStream in = new FileInputStream(tmp);
+             FileOutputStream out = new FileOutputStream(file, false)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        } catch (Exception ignored) {
+        } finally {
+            tmp.delete();
+        }
     }
 
     private void purgeAll() {

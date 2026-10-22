@@ -1,6 +1,6 @@
 # Wahtuh Pho — Architecture
 
-**Date:** 2026-10-19 · **Status:** Phase B scaffold (Rust workspace compiles, `cargo test` green; no FFI backend linked yet)
+**Date:** 2026-10-19 · **Status:** Rust research core (workspace compiles, `cargo test` green; local whisper.cpp backend present; not linked into the Android APK)
 
 This document describes the Rust workspace as built. It is the contract that
 future work (the `wahtuh-jni` Android bridge, the FFI engine backend) must
@@ -12,7 +12,7 @@ honor.
 
 ```
 wahtuh-pho/
-├── Cargo.toml                      # workspace, resolver = "2", std-only (no external deps)
+├── Cargo.toml                      # research workspace; whisper-rs for local inference
 ├── crates/
 │   ├── wahtuh-audio/               # PCM plumbing: capture → chunks
 │   │   └── src/lib.rs              # PcmSample=i16, AudioConfig, Chunker (30s+overlap),
@@ -240,7 +240,7 @@ trait. The deciding experiment before committing is specified in
 
 ---
 
-# Android app (v0.3.1)
+# Android app (v0.3.2)
 
 The shipped APK is a separate, Gradle-free Android implementation. It does not link the Rust crates.
 
@@ -249,9 +249,10 @@ The shipped APK is a separate, Gradle-free Android implementation. It does not l
 ```
 mic
   └─ AudioCapture (16 kHz mono float)
-      └─ SpeechAudio.trim
+      ├─ StreamingAsr (sherpa-onnx int8 zipformer) → live English preview
+      └─ Silero VAD v5 (ONNX Runtime) → SpeechAudio frames
           └─ DictationController
-              ├─ AsrManager → WhistleEngine (JNI → libneedle.a)
+              ├─ AsrManager → WhistleEngine (JNI → libneedle.a), final transcript
               ├─ TranscriptionRouter (local-only chokepoint)
               │   └─ CloudTranscriber (Groq / Gemini / Deepgram / OpenAI)
               ├─ TextPipeline (punctuation, fillers, dictionary, snippets, style)
@@ -263,9 +264,8 @@ mic
 
 | Path | Responsibility |
 |---|---|
-| `app/src/com/wahtuh/pho/asr/` | Whistle model install, JNI engine, `AsrManager` |
-| `app/src/com/wahtuh/pho/audio/` | `AudioCapture` (AudioRecord) and `Wav` read/write |
-| `app/src/com/wahtuh/pho/speech/` | VAD/trim/utterance splitting over RMS frames |
+| `app/src/com/wahtuh/pho/asr/` | Whistle model install, JNI engine, `AsrManager`, Silero VAD, streaming sherpa-onnx preview |
+| `app/src/com/wahtuh/pho/audio/` | `AudioCapture`, `Wav`, and adaptive VAD/trim/splitting |
 | `app/src/com/wahtuh/pho/dictation/` | Session state machine and listener contract |
 | `app/src/com/wahtuh/pho/cloud/` | Multipart/JSON clients and privacy router |
 | `app/src/com/wahtuh/pho/text/` | Deterministic pipeline, dictionary, snippets, edits, WER/CER |
@@ -289,7 +289,7 @@ The library links `libneedle.a` and bundles `libc++_shared.so`. Model loading is
 
 ## Android build
 
-`scripts/build.sh` copies JNI libraries, compiles resources with `aapt2`, compiles Java with `javac`, converts with D8 (`--release --min-api 26 --lib android.jar`), packages `classes.dex` and `lib/arm64-v8a`, zipaligns, signs, and verifies. Legacy `dx` is not used because it lacks lambda desugaring. No Gradle or Kotlin dependencies remain.
+`scripts/build.sh` copies JNI and ONNX Runtime libraries, compiles resources with `aapt2`, compiles Java with `javac`, converts with D8 (`--release --min-api 26 --lib android.jar`), packages `classes.dex`, the Silero model, and `lib/arm64-v8a`, zipaligns, signs, and verifies. Legacy `dx` is not used because it lacks lambda desugaring. No Gradle or Kotlin dependencies remain.
 
 ## Android storage
 

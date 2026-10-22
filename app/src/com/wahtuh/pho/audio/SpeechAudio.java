@@ -68,42 +68,57 @@ public final class SpeechAudio {
     }
 
     public static Plan analyze(float[] pcm, int sampleRate) {
+        return analyze(pcm, sampleRate, null, 0);
+    }
+
+    /** Uses neural probabilities when available; falls back to the adaptive gate. */
+    public static Plan analyze(float[] pcm, int sampleRate, float[] probabilities,
+                               int probabilityFrameSamples) {
         int hop = Math.max(1, sampleRate * FRAME_MS / 1000);
         int frames = pcm.length == 0 ? 0 : (pcm.length + hop - 1) / hop;
         if (frames == 0) return emptyPlan(0, sampleRate);
 
-        float[] rms = new float[frames];
-        float[] zcr = new float[frames];
-        float[] noiseSample = new float[frames];
-        for (int i = 0; i < frames; i++) {
-            int start = i * hop;
-            int end = Math.min(pcm.length, start + hop);
-            double sum = 0;
-            int crossings = 0;
-            float previous = pcm[start];
-            for (int j = start; j < end; j++) {
-                float value = pcm[j];
-                sum += value * value;
-                if ((value >= 0) != (previous >= 0)) crossings++;
-                previous = value;
-            }
-            rms[i] = (float) Math.sqrt(sum / Math.max(1, end - start));
-            zcr[i] = crossings / (float) Math.max(1, end - start - 1);
-            noiseSample[i] = rms[i];
-        }
-
-        Arrays.sort(noiseSample);
-        float floor = noiseSample[(int) Math.min(noiseSample.length - 1,
-                noiseSample.length * 0.15f)];
-        float threshold = Math.max(0.0065f, Math.min(0.045f, floor * 2.8f));
-
         boolean[] voiced = new boolean[frames];
         int speechFrames = 0;
-        for (int i = 0; i < frames; i++) {
-            boolean speechShape = zcr[i] > 0.004f && zcr[i] < 0.42f;
-            boolean loud = rms[i] > threshold * 2.15f;
-            voiced[i] = rms[i] > threshold && (speechShape || loud);
-            if (voiced[i]) speechFrames++;
+        if (probabilities != null && probabilities.length > 0
+                && probabilityFrameSamples > 0) {
+            for (int i = 0; i < frames; i++) {
+                int at = Math.min(probabilities.length - 1,
+                        (i * hop) / probabilityFrameSamples);
+                voiced[i] = probabilities[at] >= 0.5f;
+                if (voiced[i]) speechFrames++;
+            }
+        } else {
+            float[] rms = new float[frames];
+            float[] zcr = new float[frames];
+            float[] noiseSample = new float[frames];
+            for (int i = 0; i < frames; i++) {
+                int start = i * hop;
+                int end = Math.min(pcm.length, start + hop);
+                double sum = 0;
+                int crossings = 0;
+                float previous = pcm[start];
+                for (int j = start; j < end; j++) {
+                    float value = pcm[j];
+                    sum += value * value;
+                    if ((value >= 0) != (previous >= 0)) crossings++;
+                    previous = value;
+                }
+                rms[i] = (float) Math.sqrt(sum / Math.max(1, end - start));
+                zcr[i] = crossings / (float) Math.max(1, end - start - 1);
+                noiseSample[i] = rms[i];
+            }
+
+            Arrays.sort(noiseSample);
+            float floor = noiseSample[(int) Math.min(noiseSample.length - 1,
+                    noiseSample.length * 0.15f)];
+            float threshold = Math.max(0.0065f, Math.min(0.045f, floor * 2.8f));
+            for (int i = 0; i < frames; i++) {
+                boolean speechShape = zcr[i] > 0.004f && zcr[i] < 0.42f;
+                boolean loud = rms[i] > threshold * 2.15f;
+                voiced[i] = rms[i] > threshold && (speechShape || loud);
+                if (voiced[i]) speechFrames++;
+            }
         }
 
         boolean[] active = voiced.clone();
@@ -172,8 +187,12 @@ public final class SpeechAudio {
     }
 
     public static float[] prepare(float[] pcm, int sampleRate) {
+        return prepare(pcm, sampleRate, analyze(pcm, sampleRate));
+    }
+
+    public static float[] prepare(float[] pcm, int sampleRate, Plan plan) {
         if (pcm == null || pcm.length == 0) return new float[0];
-        Plan plan = analyze(pcm, sampleRate);
+        if (plan == null) plan = analyze(pcm, sampleRate);
         if (plan.firstFrame < 0) return new float[0];
         int hop = Math.max(1, sampleRate * FRAME_MS / 1000);
         int preFrames = Math.max(1, PRE_ROLL_MS / FRAME_MS);

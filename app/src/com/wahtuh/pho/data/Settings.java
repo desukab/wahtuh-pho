@@ -22,6 +22,7 @@ public final class Settings {
     public static final String[] LANGUAGES = {
             LANG_AUTO, LANG_EN, LANG_DE, LANG_FR, LANG_ES, LANG_IT, LANG_NL, LANG_PL};
 
+    public static final String STYLE_AUTO = "auto";
     public static final String STYLE_DEFAULT = "default";
     public static final String STYLE_FORMAL = "formal";
     public static final String STYLE_CASUAL = "casual";
@@ -60,6 +61,14 @@ public final class Settings {
     public String style() { return p.getString("style", STYLE_DEFAULT); }
     public void setStyle(String v) { p.edit().putString("style", v).apply(); }
 
+    /** AUTO keeps the category default; any other value overrides it. */
+    public String styleForCategory(String category) {
+        return p.getString("style_" + category, STYLE_AUTO);
+    }
+    public void setStyleForCategory(String category, String value) {
+        p.edit().putString("style_" + category, value).apply();
+    }
+
     public boolean cleanup() { return p.getBoolean("cleanup", false); }
     public void setCleanup(boolean v) { p.edit().putBoolean("cleanup", v).apply(); }
 
@@ -73,6 +82,18 @@ public final class Settings {
     /** Hold with text selected to rewrite that selection with a spoken command. */
     public boolean commandMode() { return p.getBoolean("command_mode", true); }
     public void setCommandMode(boolean v) { p.edit().putBoolean("command_mode", v).apply(); }
+
+    /** On-device words appear while speaking; the final pass still uses Whistle. */
+    public boolean streamingPreview() { return p.getBoolean("streaming_preview", true); }
+    public void setStreamingPreview(boolean v) {
+        p.edit().putBoolean("streaming_preview", v).apply();
+    }
+
+    /** Banking, payment, wallet, authenticator, and password-manager stand-down. */
+    public boolean blockSensitiveApps() { return p.getBoolean("block_sensitive_apps", true); }
+    public void setBlockSensitiveApps(boolean v) {
+        p.edit().putBoolean("block_sensitive_apps", v).apply();
+    }
 
     public boolean punctuation() { return p.getBoolean("punctuation", true); }
     public void setPunctuation(boolean v) { p.edit().putBoolean("punctuation", v).apply(); }

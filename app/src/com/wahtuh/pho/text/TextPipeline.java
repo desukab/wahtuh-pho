@@ -762,22 +762,37 @@ public final class TextPipeline {
     }
 
     /** App-aware tone uses only the package name, never screen contents. */
-    public static String styleForPackage(String packageName) {
-        if (packageName == null || packageName.isEmpty()) return "default";
+    public static String categoryForPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return "other";
         String p = packageName.toLowerCase(java.util.Locale.US);
         if (p.equals("com.google.android.gm")
                 || p.contains("outlook") || p.contains("protonmail")
                 || p.contains("thunderbird") || p.contains("email")) {
-            return "formal";
+            return "email";
+        }
+        if (p.contains("slack") || p.contains("teams") || p.contains("dynamite")
+                || p.contains("webex") || p.contains("zoom") || p.contains("workplace")) {
+            return "work";
         }
         if (p.contains("whatsapp") || p.contains("telegram") || p.contains("messenger")
-                || p.contains("discord") || p.contains("slack") || p.contains("instagram")
+                || p.contains("discord") || p.contains("instagram")
                 || p.contains("messaging") || p.contains("mms") || p.contains("messages")
-                || p.contains("teams") || p.contains("signal") || p.contains("snapchat")
+                || p.contains("signal") || p.contains("snapchat")
                 || p.contains("viber") || p.contains("wechat") || p.contains("kakao")) {
-            return "casual";
+            return "chat";
         }
+        return "other";
+    }
+
+    public static String defaultStyleForCategory(String category) {
+        if ("email".equals(category)) return "formal";
+        if ("chat".equals(category)) return "casual";
         return "default";
+    }
+
+    /** Backwards-compatible preset used by callers that only need a style. */
+    public static String styleForPackage(String packageName) {
+        return defaultStyleForCategory(categoryForPackage(packageName));
     }
 
     public static boolean hasTelugu(String s) {
