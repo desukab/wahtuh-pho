@@ -40,6 +40,7 @@ import com.wahtuh.pho.service.InsertAccessibilityService;
 import com.wahtuh.pho.text.Snippets;
 import com.wahtuh.pho.text.TextPipeline;
 import com.wahtuh.pho.ui.Ui;
+import com.wahtuh.pho.update.UpdateChecker;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -53,7 +54,9 @@ import java.util.Locale;
 public final class MainActivity extends android.app.Activity {
     private static final int REQ_MIC = 10;
     private static final int REQ_NOTIF = 11;
-    private static final String APP_VERSION = "0.4.0";
+    private static final String APP_VERSION = "0.4.1";
+    private static final long UPDATE_CHECK_MS = 6 * 60 * 60 * 1000L;
+    private static final long UPDATE_REMIND_MS = 7 * 24 * 60 * 60 * 1000L;
 
     private Settings settings;
     private SecureStore secure;
@@ -63,6 +66,7 @@ public final class MainActivity extends android.app.Activity {
 
     private int tab = 0;
     private boolean refreshing;
+    private boolean updateChecking;
     private View drawer;
     private boolean drawerOpen;
 
@@ -114,6 +118,7 @@ public final class MainActivity extends android.app.Activity {
             return;
         }
         render();
+        checkForUpdates(false);
     }
 
     private void render() {
@@ -1112,9 +1117,12 @@ public final class MainActivity extends android.app.Activity {
         LinearLayout polishText = new LinearLayout(this);
         polishText.setOrientation(LinearLayout.VERTICAL);
         polishText.addView(Ui.pixel(this, "AI POLISH", 9, Ui.TEXT));
+        boolean fastPolish = settings.cleanup() && settings.fastCloud()
+                && !Settings.LOCAL.equals(settings.provider());
         polishText.addView(Ui.body(this, settings.cleanup()
-                ? "ON  ·  text-only polish with Groq, OpenAI, or Gemini"
-                : "OFF  ·  text-only polish with Groq, OpenAI, or Gemini",
+                ? (fastPolish ? "ON  ·  bypassed by Fast Cloud"
+                : "ON  ·  text-only polish with your provider or a separate key")
+                : "OFF  ·  text-only polish with your provider or a separate key",
                 16, settings.cleanup() ? Ui.ACCENT2 : Ui.MUTED));
         polish.addView(polishText, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -1131,15 +1139,14 @@ public final class MainActivity extends android.app.Activity {
             }
             if (c && noCleanupModel(settings.provider()) && !hasCleanupKey()) {
                 clean.setChecked(false);
-                Toast.makeText(this, settings.providerLabel()
-                                + " transcribes; add a Groq, OpenAI, or Gemini key to polish",
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Deepgram has no text model; add a Groq, "
+                                + "OpenAI, or Gemini key to polish", Toast.LENGTH_SHORT).show();
                 return;
             }
             if (c && !noCleanupModel(settings.provider())
                     && !secure.has(settings.keyName(settings.provider()))) {
                 clean.setChecked(false);
-                Toast.makeText(this, "Add a " + Settings.providerName(settings.provider())
+                Toast.makeText(this, "Add the " + Settings.providerName(settings.provider())
                         + " key first", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -1148,6 +1155,33 @@ public final class MainActivity extends android.app.Activity {
         });
         polish.addView(clean);
         list.addView(polish, top(6));
+
+        if (!Settings.LOCAL.equals(settings.provider())) {
+            LinearLayout fast = new LinearLayout(this);
+            fast.setOrientation(LinearLayout.HORIZONTAL);
+            fast.setGravity(Gravity.CENTER_VERTICAL);
+            fast.setBackground(Ui.panel(Ui.SURFACE, Ui.LINE, this));
+            fast.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 14), Ui.dp(this, 10));
+            LinearLayout fastText = new LinearLayout(this);
+            fastText.setOrientation(LinearLayout.VERTICAL);
+            fastText.addView(Ui.pixel(this, "FAST CLOUD", 9, Ui.TEXT));
+            fastText.addView(Ui.body(this, settings.fastCloud()
+                    ? "ON  ·  insert after transcription; skip AI polish"
+                    : "OFF  ·  wait for AI polish before inserting",
+                    16, settings.fastCloud() ? Ui.ACCENT2 : Ui.MUTED));
+            fast.addView(fastText, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            Switch fastSwitch = new Switch(this);
+            fastSwitch.setChecked(settings.fastCloud());
+            fastSwitch.setThumbTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+            fastSwitch.setTrackTintList(android.content.res.ColorStateList.valueOf(Ui.LINE));
+            fastSwitch.setOnCheckedChangeListener((b, c) -> {
+                settings.setFastCloud(c);
+                render();
+            });
+            fast.addView(fastSwitch);
+            list.addView(fast, top(6));
+        }
 
         LinearLayout context = new LinearLayout(this);
         context.setOrientation(LinearLayout.HORIZONTAL);
@@ -1285,6 +1319,7 @@ public final class MainActivity extends android.app.Activity {
     private String polishStatus() {
         if (settings.localOnly() || Settings.LOCAL.equals(settings.provider())) return "";
         if (!settings.cleanup()) return "  ·  polish off";
+        if (settings.fastCloud()) return "  ·  fast cloud";
         boolean ready = noCleanupModel(settings.provider())
                 ? hasCleanupKey()
                 : secure.has(settings.keyName(settings.provider()));
@@ -1292,7 +1327,7 @@ public final class MainActivity extends android.app.Activity {
     }
 
     private static boolean noCleanupModel(String provider) {
-        return Settings.DEEPGRAM.equals(provider) || Settings.ASSEMBLYAI.equals(provider);
+        return Settings.DEEPGRAM.equals(provider);
     }
 
     private boolean hasCleanupKey() {
@@ -1550,6 +1585,7 @@ public final class MainActivity extends android.app.Activity {
 
         panel.addView(drawerSection("GENERAL"));
         panel.addView(drawerItem("SETTINGS", this::showSettings));
+        panel.addView(drawerItem("CHECK FOR UPDATES", () -> checkForUpdates(true)));
         panel.addView(drawerItem("CLEAR TRANSCRIPTS", this::confirmClear));
         panel.addView(drawerSection("SUPPORT"));
         panel.addView(drawerItem("REPORT A BUG", () ->
@@ -1798,6 +1834,56 @@ public final class MainActivity extends android.app.Activity {
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Wahtuh Pho", text == null ? "" : text));
         Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show();
+    }
+
+    private void checkForUpdates(boolean manual) {
+        if (updateChecking) return;
+        long now = System.currentTimeMillis();
+        if (!manual && now - settings.updateCheckedAt() < UPDATE_CHECK_MS) return;
+        updateChecking = true;
+        new Thread(() -> {
+            UpdateChecker.Release release = null;
+            try {
+                release = UpdateChecker.latest(APP_VERSION);
+            } catch (Throwable ignored) {}
+            final UpdateChecker.Release found = release;
+            main.post(() -> {
+                updateChecking = false;
+                if (isFinishing() || isDestroyed()) return;
+                if (found == null) {
+                    if (manual) Toast.makeText(this, "Couldn't check for updates",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                long at = System.currentTimeMillis();
+                settings.setUpdateCheckedAt(at);
+                if (!found.newer) {
+                    if (manual) Toast.makeText(this, "Wahtuh Pho is up to date",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!manual && found.version.equals(settings.updatePromptedVersion())
+                        && at - settings.updatePromptedAt() < UPDATE_REMIND_MS) {
+                    return;
+                }
+                settings.setUpdatePrompted(found.version, at);
+                showUpdate(found);
+            });
+        }, "wahtuh-update").start();
+    }
+
+    private void showUpdate(UpdateChecker.Release release) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle("UPDATE AVAILABLE")
+                .setMessage("Wahtuh Pho v" + release.version + " is available.\n\n"
+                        + "You have v" + APP_VERSION + ".")
+                .setNegativeButton("LATER", null)
+                .setPositiveButton("DOWNLOAD", (d, w) -> openUrl(
+                        release.apkUrl.isEmpty() ? release.pageUrl : release.apkUrl));
+        if (!release.pageUrl.isEmpty()) {
+            builder.setNeutralButton("NOTES", (d, w) -> openUrl(release.pageUrl));
+        }
+        builder.show();
     }
 
     private void openUrl(String url) {

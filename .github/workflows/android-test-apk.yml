@@ -53,7 +53,7 @@ jobs:
       - name: Build and verify ARM64 APK
         run: |
           ./scripts/build.sh
-          APK="build/wahtuh-pho-${VERSION_NAME:-0.4.0}.apk"
+          APK="build/wahtuh-pho-${VERSION_NAME:-0.4.1}.apk"
           test -s "$APK"
           apksigner verify --verbose "$APK"
           zipalign -c -v 4 "$APK"
@@ -62,9 +62,9 @@ jobs:
       - name: Upload installable test APK
         uses: actions/upload-artifact@v4
         with:
-          name: wahtuh-pho-0.4.0-android-arm64
+          name: wahtuh-pho-0.4.1-android-arm64
           path: |
-            build/wahtuh-pho-0.4.0.apk
+            build/wahtuh-pho-0.4.1.apk
             build/apk.sha256
           if-no-files-found: error
           retention-days: 30

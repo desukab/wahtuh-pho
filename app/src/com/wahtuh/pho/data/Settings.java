@@ -73,6 +73,19 @@ public final class Settings {
     public boolean cleanup() { return p.getBoolean("cleanup", false); }
     public void setCleanup(boolean v) { p.edit().putBoolean("cleanup", v).apply(); }
 
+    /** Cloud fast path: insert after transcription and skip the extra polish call. */
+    public boolean fastCloud() { return p.getBoolean("fast_cloud", true); }
+    public void setFastCloud(boolean v) { p.edit().putBoolean("fast_cloud", v).apply(); }
+
+    public long updateCheckedAt() { return p.getLong("update_checked_at", 0L); }
+    public void setUpdateCheckedAt(long v) { p.edit().putLong("update_checked_at", v).apply(); }
+    public String updatePromptedVersion() { return p.getString("update_prompted_version", ""); }
+    public long updatePromptedAt() { return p.getLong("update_prompted_at", 0L); }
+    public void setUpdatePrompted(String version, long at) {
+        p.edit().putString("update_prompted_version", version)
+                .putLong("update_prompted_at", at).apply();
+    }
+
     public boolean appTone() { return p.getBoolean("app_tone", true); }
     public void setAppTone(boolean v) { p.edit().putBoolean("app_tone", v).apply(); }
 

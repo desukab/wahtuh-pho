@@ -147,6 +147,7 @@ public final class SpeechAudio {
         int maxFrames = Math.max(1, MAX_SEGMENT_MS / FRAME_MS);
         List<Segment> segments = new ArrayList<>();
         int previousLast = -1;
+        int floorFrame = 0;
         int i = 0;
         while (i < frames) {
             while (i < frames && !active[i]) i++;
@@ -154,14 +155,23 @@ public final class SpeechAudio {
             int start = i;
             int last = i;
             int j = i;
+            boolean hardCut = false;
             while (j < frames) {
                 if (active[j]) last = j;
                 if (j - last >= gapFrames && j - start > 1) break;
-                if (j - start >= maxFrames) break;
+                if (j - start >= maxFrames) {
+                    int cut = quietCut(pcm, hop, start, j);
+                    if (cut > start && cut < j) {
+                        j = cut;
+                        last = Math.min(last, j - 1);
+                        hardCut = true;
+                    }
+                    break;
+                }
                 j++;
             }
-            int startFrame = Math.max(0, start - padFrames);
-            int endFrame = Math.min(frames, last + padFrames + 1);
+            int startFrame = Math.max(floorFrame, Math.max(0, start - padFrames));
+            int endFrame = hardCut ? j : Math.min(frames, last + padFrames + 1);
             int s = startFrame * hop;
             int e = Math.min(pcm.length, endFrame * hop);
             int pause = previousLast < 0 ? 0 : Math.max(0, (start - previousLast) * FRAME_MS);
@@ -172,6 +182,7 @@ public final class SpeechAudio {
                         e * 1000 / sampleRate));
             }
             previousLast = last;
+            if (hardCut) floorFrame = j;
             i = Math.max(j, start + 1);
         }
 
@@ -179,6 +190,23 @@ public final class SpeechAudio {
         int speechMs = speechFrames * FRAME_MS;
         return new Plan(segments, speechMs, Math.max(0, totalMs - speechMs), totalMs,
                 voiced, active, firstFrame, lastFrame);
+    }
+
+    private static int quietCut(float[] pcm, int hop, int start, int limit) {
+        int from = Math.max(start + 25, limit - Math.max(1, 2000 / FRAME_MS));
+        int best = limit;
+        double quietest = Double.MAX_VALUE;
+        for (int frame = from; frame < limit; frame++) {
+            int at = frame * hop;
+            int end = Math.min(pcm.length, at + hop);
+            double energy = 0;
+            for (int i = at; i < end; i++) energy += pcm[i] * pcm[i];
+            if (energy < quietest) {
+                quietest = energy;
+                best = frame;
+            }
+        }
+        return best;
     }
 
     private static Plan emptyPlan(int totalMs, int sampleRate) {
@@ -238,6 +266,19 @@ public final class SpeechAudio {
         float[] out = new float[Math.max(0, end - start)];
         if (out.length > 0) System.arraycopy(pcm, start, out, 0, out.length);
         return out;
+    }
+
+    /** Normalizes a copy of the clip without VAD trimming. */
+    public static float[] normalizeForEngine(float[] pcm) {
+        if (pcm == null || pcm.length == 0) return new float[0];
+        return normalize(Arrays.copyOf(pcm, pcm.length));
+    }
+
+    public static double rms(float[] pcm) {
+        if (pcm == null || pcm.length == 0) return 0;
+        double sum = 0;
+        for (float value : pcm) sum += value * value;
+        return Math.sqrt(sum / pcm.length);
     }
 
     private static float[] normalize(float[] pcm) {

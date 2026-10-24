@@ -10,8 +10,8 @@ VENDOR="${WAHTUH_VENDOR:-$ROOT/vendor}"
 D8_JAR="${D8_JAR:-$VENDOR/d8.jar}"
 ORT="${WAHTUH_ORT:-$VENDOR/onnxruntime}"
 SHERPA="${WAHTUH_SHERPA:-$VENDOR/sherpa-onnx}"
-VERSION_CODE="${VERSION_CODE:-6}"
-VERSION_NAME="${VERSION_NAME:-0.4.0}"
+VERSION_CODE="${VERSION_CODE:-7}"
+VERSION_NAME="${VERSION_NAME:-0.4.1}"
 ABI="${ABI:-arm64-v8a}"
 
 [ -f "$ANDROID_JAR" ] || { echo "Missing $ANDROID_JAR" >&2; exit 1; }

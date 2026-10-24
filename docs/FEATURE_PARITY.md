@@ -1,6 +1,6 @@
 # Feature Parity — Wispr Flow vs Wahtuh Pho (Android)
 
-**Updated:** 2026-10-22 · **Basis:** clean-room public research in
+**Updated:** 2026-10-24 · **Basis:** clean-room public research in
 [WISPR_FLOW_RESEARCH.md](WISPR_FLOW_RESEARCH.md), the static Android teardown in
 [ANDROID_UX_TEARDOWN.md](ANDROID_UX_TEARDOWN.md), static inspection of the
 supplied Wispr Flow 2.6.2 APK (`com.wispr.flowapp`, versionCode 170), and the
@@ -12,7 +12,7 @@ structure. No code, assets, or copy were taken.
 
 ## Current matrix
 
-| Capability | Wispr Flow (public/observed) | Wahtuh Pho 0.4.0 | Status |
+| Capability | Wispr Flow (public/observed) | Wahtuh Pho 0.4.1 | Status |
 |---|---|---|---|
 | On-device transcription | Never. Cloud only. | Whistle 16.9 MB CPU model, offline by default, cannot silently fall back | **done (and beyond)** |
 | Voice activity detection | Server/streaming VAD with phrase boundaries | Silero VAD v5 (2.3 MB, ONNX Runtime) on-device with adaptive RMS/ZCR fallback; 20 ms frame mapping and phrase splitting | **done (device verification pending)** |
@@ -67,7 +67,7 @@ structure. No code, assets, or copy were taken.
    signals; sync needs an account, which is a deliberate non-goal.
 4. **Web-editor shims.** The sensitive-app guard is behavioral and testable
    without screen capture, but per-editor shims need real-device coverage.
-5. **Deep device verification.** The v0.4.0 build still needs a physical pass
+5. **Deep device verification.** The v0.4.1 build still needs a physical pass
    for the newest features: Command Mode, retention, boot restore, battery, and
    character-limit overflow reporting.
 

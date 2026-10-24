@@ -52,6 +52,8 @@ public final class DictationController {
 
     private AudioCapture capture;
     private StreamingAsr streaming;
+    private SileroVad vad;
+    private boolean vadUnavailable;
     private DictationListener listener;
     private String state = IDLE;
     private int session;
@@ -152,6 +154,9 @@ public final class DictationController {
                 }
                 final StreamingAsr livePreview = live;
                 main.post(() -> startCapture(token, livePreview));
+                Thread warm = new Thread(this::cachedVad, "wahtuh-vad-warm");
+                warm.setDaemon(true);
+                warm.start();
             } catch (Throwable e) {
                 main.post(() -> fail(token, "Could not prepare models: " + message(e)));
             }
@@ -262,21 +267,42 @@ public final class DictationController {
     }
 
     private SpeechAudio.Plan speechPlan(float[] samples, int sampleRate) {
-        SileroVad vad = null;
-        try {
-            vad = new SileroVad(app);
-            float[] probabilities = vad.probabilities(samples, sampleRate);
-            if (probabilities != null && probabilities.length > 0) {
-                return SpeechAudio.analyze(samples, sampleRate, probabilities, SileroVad.CHUNK);
-            }
-        } catch (Throwable ignored) {
-            // Missing model, unsupported ABI, or a session failure: keep the local gate.
-        } finally {
-            if (vad != null) {
-                try { vad.close(); } catch (Exception ignored) {}
+        int durationMs = samples.length * 1000 / Math.max(1, sampleRate);
+        if (durationMs < 15000) return SpeechAudio.analyze(samples, sampleRate);
+        SileroVad neural = cachedVad();
+        if (neural != null) {
+            try {
+                float[] probabilities;
+                synchronized (neural) {
+                    probabilities = neural.probabilities(samples, sampleRate);
+                }
+                if (probabilities != null && probabilities.length > 0) {
+                    SpeechAudio.Plan neuralPlan = SpeechAudio.analyze(samples, sampleRate,
+                            probabilities, SileroVad.CHUNK);
+                    SpeechAudio.Plan adaptive = SpeechAudio.analyze(samples, sampleRate);
+                    if (!neuralPlan.hasSpeech()
+                            || adaptive.speechMs > neuralPlan.speechMs * 2) {
+                        return adaptive.hasSpeech() ? adaptive : neuralPlan;
+                    }
+                    return neuralPlan;
+                }
+            } catch (Throwable ignored) {
+                // Keep the adaptive gate if the ONNX session fails mid-call.
             }
         }
         return SpeechAudio.analyze(samples, sampleRate);
+    }
+
+    private synchronized SileroVad cachedVad() {
+        if (vad != null) return vad;
+        if (vadUnavailable) return null;
+        try {
+            vad = new SileroVad(app);
+        } catch (Throwable e) {
+            vadUnavailable = true;
+            return null;
+        }
+        return vad;
     }
 
     private void finish(int token, AudioCapture.Recording rec, String style, String context) {
@@ -292,14 +318,16 @@ public final class DictationController {
                 return;
             }
             SpeechAudio.Plan plan = speechPlan(rec.samples, rec.sampleRate);
-            if (!plan.hasSpeech()) {
+            if (rec.samples.length < rec.sampleRate / 6) {
                 main.post(() -> fail(token, "No speech detected."));
                 return;
             }
-            float[] prepared = SpeechAudio.prepare(rec.samples, rec.sampleRate, plan);
-            if (prepared.length < rec.sampleRate / 6) {
-                main.post(() -> fail(token, "No speech detected."));
-                return;
+            if (!plan.hasSpeech()) {
+                if (rec.durationMs > 30000
+                        || SpeechAudio.rms(rec.samples) < 0.004f) {
+                    main.post(() -> fail(token, "No speech detected."));
+                    return;
+                }
             }
 
             Settings settings = new Settings(app);
@@ -310,12 +338,13 @@ public final class DictationController {
             String raw;
 
             boolean split = plan.shouldSplit(rec.durationMs) && plan.segments.size() > 1;
+            float[] engineAudio = null;
             if (split) {
                 emitState(TRANSCRIBING, "Writing " + plan.segments.size() + " phrases");
                 StringBuilder merged = new StringBuilder();
                 engine = Settings.LOCAL.equals(provider) ? "whistle" : "cloud:" + provider;
                 for (SpeechAudio.Segment segment : plan.segments) {
-                    float[] piece = SpeechAudio.prepare(segment.samples, rec.sampleRate);
+                    float[] piece = SpeechAudio.normalizeForEngine(segment.samples);
                     if (piece.length < rec.sampleRate / 6) continue;
                     EngineResult result = transcribeClip(settings, provider, piece,
                             rec.sampleRate, language, detected);
@@ -334,7 +363,8 @@ public final class DictationController {
             } else {
                 emitState(TRANSCRIBING, Settings.LOCAL.equals(provider)
                         ? "Writing" : "Writing with " + settings.providerLabel());
-                EngineResult result = transcribeClip(settings, provider, prepared,
+                engineAudio = SpeechAudio.normalizeForEngine(rec.samples);
+                EngineResult result = transcribeClip(settings, provider, engineAudio,
                         rec.sampleRate, language, detected);
                 raw = result.text;
                 engine = result.engine;
@@ -343,6 +373,19 @@ public final class DictationController {
                 }
             }
 
+            if ((raw == null || raw.trim().isEmpty()) && split
+                    && rec.durationMs <= 30000) {
+                if (engineAudio == null) {
+                    engineAudio = SpeechAudio.normalizeForEngine(rec.samples);
+                }
+                EngineResult retry = transcribeClip(settings, provider, engineAudio,
+                        rec.sampleRate, language, detected);
+                raw = retry.text;
+                engine = retry.engine;
+                if (retry.language != null && !retry.language.isEmpty()) {
+                    detected = retry.language;
+                }
+            }
             if (raw == null || raw.trim().isEmpty()) {
                 main.post(() -> fail(token, "No speech recognized."));
                 return;
@@ -371,8 +414,8 @@ public final class DictationController {
                     String[] target = cleanupTarget(settings, provider);
                     if (target == null) {
                         main.post(() -> fail(token, "Offline Command Mode supports case, "
-                                + "list, and delete commands; add a Groq, OpenAI, or "
-                                + "Gemini key for freeform rewrites"));
+                                + "list, and delete commands; add a Groq, OpenAI, Gemini, "
+                                + "or AssemblyAI key for freeform rewrites"));
                         return;
                     }
                     try {
@@ -391,7 +434,9 @@ public final class DictationController {
                     }
                 }
             } else {
-                String[] target = settings.cleanup() && !Settings.LOCAL.equals(provider)
+                boolean fastCloud = settings.fastCloud() && !Settings.LOCAL.equals(provider);
+                String[] target = settings.cleanup() && !fastCloud
+                        && !Settings.LOCAL.equals(provider)
                         && !text.trim().isEmpty() ? cleanupTarget(settings, provider) : null;
                 if (target != null) {
                     emitState(TRANSCRIBING, "Polishing");
@@ -500,12 +545,10 @@ public final class DictationController {
     private String[] cleanupTarget(Settings settings, String preferred) {
         SecureStore store = new SecureStore(app);
         String[] order = { preferred, Settings.GROQ, Settings.OPENAI, Settings.GEMINI };
-        boolean separateCleanup = Settings.DEEPGRAM.equals(preferred)
-                || Settings.ASSEMBLYAI.equals(preferred);
+        boolean fallbackCleanup = Settings.DEEPGRAM.equals(preferred);
         for (String p : order) {
-            if (Settings.LOCAL.equals(p) || Settings.DEEPGRAM.equals(p)
-                    || Settings.ASSEMBLYAI.equals(p)) continue;
-            if (!p.equals(preferred) && !separateCleanup) continue;
+            if (Settings.LOCAL.equals(p) || Settings.DEEPGRAM.equals(p)) continue;
+            if (!p.equals(preferred) && !fallbackCleanup) continue;
             try {
                 String key = store.get(settings.keyName(p));
                 if (key != null && !key.trim().isEmpty()) return new String[] { p, key };

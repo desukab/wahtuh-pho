@@ -1,7 +1,7 @@
 # Wahtuh Pho — Privacy
 
-**Date:** 2026-10-22 · **Status:** the first half describes the Rust core
-design; the Android section at the end describes the v0.4.0 app.
+**Date:** 2026-10-24 · **Status:** the first half describes the Rust core
+design; the Android section at the end describes the v0.4.1 app.
 
 **One line:** in the default mode, your voice never leaves your device and
 the project collects nothing. Cloud transcription exists only as an explicit
@@ -92,7 +92,8 @@ names verified against official docs 2026-10-19; see
 | OpenAI | Audio + transcript request (`api.openai.com`) | OpenAI API data-usage policy |
 | Gemini | Audio (inline data) + transcription config (`generativelanguage.googleapis.com`) | Google API data practices |
 | Deepgram | Audio + transcript request (`api.deepgram.com`) | Deepgram privacy policy / API terms |
-| AssemblyAI | Audio upload (`api.assemblyai.com/v2/upload`), transcript job/poll (`/v2/transcript`); best-effort transcript delete after reading | AssemblyAI privacy policy / API terms |
+| AssemblyAI | Audio upload (`api.assemblyai.com/v2/upload`), transcript job/poll (`/v2/transcript`); best-effort transcript delete after reading, on a background thread | AssemblyAI privacy policy / API terms |
+| AssemblyAI LLM Gateway | Final text only for optional polish (`llm-gateway.assemblyai.com/v1/chat/completions`) with the same AssemblyAI key | AssemblyAI privacy policy / LLM Gateway terms |
 
 Optional AI cleanup/post-processing (punctuation restoration, reformatting) is
 a **separate opt-in step**, never applied silently. Local transcription
@@ -137,6 +138,12 @@ The shipped app defaults to **On-device (private)** with local-only mode **on**.
 
 ## Can leave the device
 
+On launch, the app may fetch public release metadata from
+`https://api.github.com/repos/desukab/wahtuh-pho/releases/latest` at most once
+every six hours to offer an update. This request sends no API key, transcript,
+account, or device identifier, and it is not a transcription request. Use the
+drawer's CHECK FOR UPDATES action to check manually.
+
 Only when you pick a cloud provider **and** turn local-only off:
 
 | Provider | Audio endpoint | Optional cleanup |
@@ -144,19 +151,22 @@ Only when you pick a cloud provider **and** turn local-only off:
 | Groq | `api.groq.com` transcription | final text only |
 | OpenAI | `api.openai.com` transcription | final text only |
 | Gemini | `generativelanguage.googleapis.com` | final text only |
-| Deepgram | `api.deepgram.com` transcription | final text only, routed to your configured Groq/OpenAI/Gemini key; no cleanup if none is configured |
-| AssemblyAI | `api.assemblyai.com` upload + async transcription | final text only, routed to your configured Groq/OpenAI/Gemini key; no cleanup if none is configured |
+| Deepgram | `api.deepgram.com` transcription | final text only, routed to your configured Groq/OpenAI/Gemini key; no cleanup if none is configured (Deepgram has no text-edit model) |
+| AssemblyAI | `api.assemblyai.com` upload + async transcription | final text only through `llm-gateway.assemblyai.com` using the same AssemblyAI key |
 
 When **Command Mode** is used, local case/list/delete edits stay on device.
 Freeform rewrites send the selected text and your spoken instruction to the
-configured Groq, OpenAI, or Gemini key. The selected text is untrusted content
+configured Groq, OpenAI, Gemini, or AssemblyAI key. The selected text is untrusted content
 and is not sent anywhere unless you hold the bubble with a selection, Command
 Mode is on, and the instruction is not one of the local commands.
 
-If **Field Context** is enabled (off by default), AI polish also receives a
-short list of names/code-like terms extracted from the focused field. The
-app does not send the surrounding sentences, never reads password fields,
-and never reads its own fields.
+If **Fast Cloud** is on (the default for cloud providers), the optional AI
+polish call is skipped entirely; only the deterministic on-device text pass
+runs. Command Mode still sends the selected text and spoken instruction to the
+configured rewrite provider. If **Field Context** is enabled (off by default),
+AI polish also receives a short list of names/code-like terms extracted from
+the focused field. The app does not send the surrounding sentences, never
+reads password fields, and never reads its own fields.
 
 Requests include audio, model, language hint, and short vocabulary hints from your user dictionary. No silent fallback: local-only is enforced in `TranscriptionRouter` before any network call.
 

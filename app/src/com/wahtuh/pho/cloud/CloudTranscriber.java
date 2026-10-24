@@ -28,12 +28,14 @@ public final class CloudTranscriber {
     public static final String DEEPGRAM_MODEL = "nova-3";
     public static final String ASSEMBLYAI_MODEL = "universal-3-5-pro";
     public static final String ASSEMBLYAI_FALLBACK_MODEL = "universal-2";
+    public static final String ASSEMBLYAI_CLEAN_MODEL = "qwen3.5-4b-32k-fast";
 
     public static final String GROQ_TRANSCRIBE = "https://api.groq.com/openai/v1/audio/transcriptions";
     public static final String OPENAI_TRANSCRIBE = "https://api.openai.com/v1/audio/transcriptions";
     public static final String GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
     public static final String DEEPGRAM_LISTEN = "https://api.deepgram.com/v1/listen";
     public static final String ASSEMBLYAI_BASE = "https://api.assemblyai.com";
+    public static final String ASSEMBLYAI_CHAT = "https://llm-gateway.assemblyai.com/v1/chat/completions";
 
     public static final String GROQ_CHAT = "https://api.groq.com/openai/v1/chat/completions";
     public static final String OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
@@ -156,17 +158,21 @@ public final class CloudTranscriber {
         String id = created.optString("id", "");
         if (id.isEmpty()) throw new IllegalStateException("assemblyai returned no transcript id");
         String job = ASSEMBLYAI_BASE + "/v2/transcript/" + URLEncoder.encode(id, "UTF-8");
-        long deadline = System.currentTimeMillis() + 120000L;
+        long started = System.currentTimeMillis();
+        long deadline = started + 120000L;
+        long interval = 250L;
+        String text = null;
         try {
             while (System.currentTimeMillis() < deadline) {
                 JSONObject json = assemblyAiJson("GET", job, key, null);
                 String status = json.optString("status", "");
                 if ("completed".equals(status)) {
-                    String text = json.optString("text", "");
+                    text = json.optString("text", "");
                     if (text.trim().isEmpty()) {
                         throw new IllegalStateException("assemblyai returned no text");
                     }
-                    return text.trim();
+                    text = text.trim();
+                    break;
                 }
                 if ("error".equals(status)) {
                     throw new IllegalStateException("assemblyai transcription failed: "
@@ -175,14 +181,24 @@ public final class CloudTranscriber {
                 if (!"queued".equals(status) && !"processing".equals(status)) {
                     throw new IllegalStateException("assemblyai returned status: " + status);
                 }
-                Thread.sleep(1000L);
+                Thread.sleep(interval);
+                if (System.currentTimeMillis() - started > 5000L) interval = 1000L;
             }
-            throw new IllegalStateException("assemblyai transcription timed out");
         } finally {
+            deleteLater(job, key);
+        }
+        if (text != null) return text;
+        throw new IllegalStateException("assemblyai transcription timed out");
+    }
+
+    private static void deleteLater(String job, String key) {
+        Thread t = new Thread(() -> {
             try {
                 assemblyAiJson("DELETE", job, key, null);
             } catch (Throwable ignored) {}
-        }
+        }, "assemblyai-delete");
+        t.setDaemon(true);
+        t.start();
     }
 
     private static String assemblyAiUpload(String key, byte[] wav) throws Exception {
@@ -420,7 +436,8 @@ public final class CloudTranscriber {
             case "deepgram":
                 return text.trim();
             case "assemblyai":
-                return text.trim();
+                return chat(ASSEMBLYAI_CHAT, key, ASSEMBLYAI_CLEAN_MODEL, instruction,
+                        "assemblyai");
             default:
                 throw new IllegalArgumentException("Unknown cleanup provider: " + provider);
         }
@@ -464,8 +481,10 @@ public final class CloudTranscriber {
                 return chat(OPENAI_CHAT, key, OPENAI_CLEAN_MODEL, prompt, "openai");
             case "gemini":
                 return geminiText(key, prompt);
+            case "assemblyai":
+                return chat(ASSEMBLYAI_CHAT, key, ASSEMBLYAI_CLEAN_MODEL, prompt, "assemblyai");
             default:
-                throw new IllegalArgumentException("Command Mode needs Groq, OpenAI, or Gemini");
+                throw new IllegalArgumentException("Command Mode needs Groq, OpenAI, Gemini, or AssemblyAI");
         }
     }
 
@@ -474,6 +493,7 @@ public final class CloudTranscriber {
         JSONObject root = new JSONObject();
         root.put("model", model);
         root.put("temperature", 0);
+        if ("assemblyai".equals(provider)) root.put("max_tokens", 4096);
         JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system")
                 .put("content", "You are a careful dictation editor. You never invent content."));
@@ -485,7 +505,11 @@ public final class CloudTranscriber {
         c.setConnectTimeout(20000);
         c.setReadTimeout(120000);
         c.setDoOutput(true);
-        c.setRequestProperty("Authorization", "Bearer " + key);
+        if ("assemblyai".equals(provider)) {
+            c.setRequestProperty("authorization", key);
+        } else {
+            c.setRequestProperty("Authorization", "Bearer " + key);
+        }
         c.setRequestProperty("Content-Type", "application/json");
         c.setFixedLengthStreamingMode(bytes.length);
         try (OutputStream out = c.getOutputStream()) { out.write(bytes); }

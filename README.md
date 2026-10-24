@@ -6,7 +6,7 @@ Wahtuh Pho is an independent, local-first voice keyboard and floating dictation 
 
 > Not affiliated with Wispr Flow. The interaction model is inspired by modern dictation apps; all app code, copy, and artwork here are original, including the arcade-inspired UI and 8-bit launcher icon.
 
-**[Download the latest Android APK](https://github.com/desukab/wahtuh-pho/releases/latest)** · [v0.4.0 release notes](docs/RELEASE_NOTES_0.4.0.md)
+**[Download the latest Android APK](https://github.com/desukab/wahtuh-pho/releases/latest)** · [v0.4.1 release notes](docs/RELEASE_NOTES_0.4.1.md)
 
 | Home | Settings | Offline arcade |
 |:---:|:---:|:---:|
@@ -32,7 +32,7 @@ Wispr Flow's paid promise, our clean-room notes, and the feature gaps we deliber
 
 ## Status
 
-- **Android app: v0.4.0.** Whistle local ASR, seven languages, verified insertion, snippets, writing styles, self-corrections, developer dictation, inline edit commands, selected-text Command Mode, local history retention, boot recovery, and optional cloud providers. This release adds AssemblyAI as a fifth opt-in provider on top of the 0.3.2 Run Inspector, Silero VAD, live English preview, and sensitive-app guard. Fields with a character limit insert what fits and surface the remaining dictated words. Builds as a 72 MB APK. Text tests pass **65/65**, VAD checks **14/14**, and character-fit checks **18/18**. The v0.3.0 UI, drawer, tabs, bubble visibility, and all three arcade games were exercised on a vivo V2251; v0.4.0 still needs a physical-device pass, as do voice, command, cloud, and AssemblyAI paths. See [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md) for the honest Wispr Flow comparison.
+- **Android app: v0.4.1.** Whistle local ASR, seven languages, verified insertion, snippets, writing styles, self-corrections, developer dictation, inline edit commands, selected-text Command Mode, local history retention, boot recovery, and optional cloud providers. This release adds same-key AssemblyAI polish through the AssemblyAI LLM Gateway, a Fast Cloud path that skips the polish call for speed, GitHub release update prompts, full-audio retention for final ASR, and quiet non-overlapping long-recording splits. It builds on the 0.4.0 AssemblyAI provider and the 0.3.2 Run Inspector, Silero VAD, live English preview, and sensitive-app guard. Fields with a character limit insert what fits and surface the remaining dictated words. Builds as a 72 MB APK. Text tests pass **65/65**, VAD/audio checks **19/19**, character-fit checks **18/18**, and update checks **6/6**. The v0.3.0 UI, drawer, tabs, bubble visibility, and all three arcade games were exercised on a vivo V2251; v0.4.1 still needs a physical-device pass, as do voice, command, cloud, and AssemblyAI paths. See [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md) for the honest Wispr Flow comparison.
 - **Rust core: scaffold + real local Whisper engine.** 78 workspace tests pass; the shipped APK has its own JNI bridge to Whistle and does **not** link the Rust crates. Silero VAD is integrated directly in the Android audio path.
 - The Android app is Gradle-free and built with `aapt2`, `javac`, D8, and `apksigner`.
 
@@ -106,7 +106,7 @@ export ANDROID_JAR=$HOME/asdk/android-35/android.jar
 ./scripts/build.sh            # aapt2, javac, D8, zipalign, apksigner
 ```
 
-Output: `build/wahtuh-pho-0.4.0.apk`. Override signing with
+Output: `build/wahtuh-pho-0.4.1.apk`. Override signing with
 `WAHTUH_KEYSTORE`, `WAHTUH_KEY_ALIAS`, `WAHTUH_STORE_PASS`, `WAHTUH_KEY_PASS`.
 Without them a local debug keystore is generated for testing only.
 
@@ -132,7 +132,8 @@ and [Wispr Flow research](docs/WISPR_FLOW_RESEARCH.md).
 
 - On-device mode never opens a network connection for transcription.
 - Cloud providers are only used when you explicitly select one and turn local-only off.
-- Cloud audio is sent as a standard multipart/JSON transcription request. Optional cleanup sends final text only; when transcription is Deepgram or AssemblyAI, the app can reuse your configured Groq, OpenAI, or Gemini key for that separate polish request. If **Field Context** is enabled, AI polish also receives a short list of extracted names/code terms, never the surrounding prose.
+- Cloud audio is sent as a standard multipart/JSON transcription request. Optional cleanup sends final text only. **Fast Cloud** is on by default for cloud providers and skips the AI polish call so the transcript can be inserted sooner; turn it off to wait for polish. AssemblyAI can polish with the same key through the AssemblyAI LLM Gateway; Deepgram has no text model, so it uses a separate configured Groq, OpenAI, or Gemini key. If **Field Context** is enabled, AI polish also receives a short list of extracted names/code terms, never the surrounding prose.
+- If an app update check succeeds, it fetches public release metadata from `api.github.com` at most once every six hours. It sends no account, key, transcript, or device identifier.
 - API keys are encrypted with an Android Keystore AES/GCM key and never logged.
 - Transcripts live in app-private storage. New audio is not saved; legacy audio is purged by Clear, NEVER, and the 24-hour policy. Clear history from Settings.
 
@@ -146,7 +147,7 @@ Full details: [docs/PRIVACY.md](docs/PRIVACY.md) and [docs/ANDROID_APP.md](docs/
 - Freeform Command Mode ("make this professional") requires a cloud key and an internet connection; local Command Mode covers case, list, and delete edits. It replaces the selection only if the selected text still matches what was read when recording began.
 - Final transcription is still batch; English live words stream from a small zipformer and are replaced by Whistle’s final pass on release. The IME uses composing text; the floating bubble only previews the words. Other languages have no live stream yet. Silero VAD and streaming latency remain device-unmeasured.
 - On-device language breadth is seven languages. Cloud auto-detect can cover more, but there is no local Hinglish or Telugu model.
-- Sideloaded v0.4.0, not a Play Store release. No account or sync.
+- Sideloaded v0.4.1, not a Play Store release. No account or sync.
 - App-aware tone covers common chat/email packages and falls back to the selected Default style elsewhere. It uses the package name only, never screen contents. Field Context is a separate opt-in switch, off by default, and requires AI polish.
 - Self-correction heuristics are intentionally conservative; ambiguous corrections still rely on AI polish. Whistle's local accuracy remains the main precision limit.
 

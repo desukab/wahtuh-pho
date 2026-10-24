@@ -25,6 +25,9 @@ public final class SpeechAudioTest {
         float[] padded = join(new float[RATE / 2], tone, new float[RATE / 2]);
         check("trim removes padding", true,
                 SpeechAudio.trim(padded, RATE).length < padded.length);
+        float[] normalizedFull = SpeechAudio.normalizeForEngine(padded);
+        check("full normalization keeps length", padded.length, normalizedFull.length);
+        check("full normalization keeps level", true, peak(normalizedFull) <= 0.97f);
 
         float[] neural = new float[(tone.length + 511) / 512];
         Arrays.fill(neural, 0.9f);
@@ -44,6 +47,20 @@ public final class SpeechAudioTest {
         for (float[] utterance : utterances) {
             check("utterance non-empty", true, utterance.length > 0);
         }
+
+        float[] longTone = tone(60000, 0.2f);
+        SpeechAudio.Plan longPlan = SpeechAudio.analyze(longTone, RATE);
+        check("long audio splits", true, longPlan.segments.size() > 1);
+        boolean contiguous = true;
+        for (int i = 1; i < longPlan.segments.size(); i++) {
+            if (longPlan.segments.get(i).startMs < longPlan.segments.get(i - 1).endMs) {
+                contiguous = false;
+                break;
+            }
+        }
+        check("long segments do not overlap", true, contiguous);
+        check("long audio keeps the tail", true,
+                longPlan.segments.get(longPlan.segments.size() - 1).endMs >= 59000);
 
         if (failed > 0) {
             System.out.println("RESULT: " + passed + "/" + (passed + failed) + " checks passed");

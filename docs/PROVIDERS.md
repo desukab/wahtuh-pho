@@ -36,6 +36,7 @@ verified stays **out** of the allow-list — we never invent model names.
 | AssemblyAI | Endpoints `POST /v2/upload` (raw WAV), `POST /v2/transcript`, `GET`/`DELETE /v2/transcript/{id}`; auth header `authorization: <key>`; models `universal-3-5-pro` + `universal-2`; `language_detection` for auto, `language_code` for explicit languages; `keyterms_prompt` for vocabulary | AssemblyAI model selection: https://www.assemblyai.com/docs/pre-recorded-audio/select-the-speech-model ; supported languages: https://www.assemblyai.com/docs/pre-recorded-audio/supported-languages | 2026-10-22 | ✅ verified from official docs; **live call not run — no key available** |
 | AssemblyAI | Supported coverage: Universal-3.5 Pro covers 18 languages including `en`, `de`, `fr`, `es`, `it`, `nl` but not Polish; Universal-2 covers 99 including Polish. The app sends Universal-2 alone for explicit Polish. | AssemblyAI supported-languages doc (above) | 2026-10-22 | ✅ verified |
 | AssemblyAI | Pricing | Not checked against the official pricing page | 2026-10-22 | ❌ unverified — check AssemblyAI pricing before budgeting |
+| AssemblyAI | LLM Gateway cleanup: OpenAI-compatible `POST https://llm-gateway.assemblyai.com/v1/chat/completions`, header `authorization: <key>`, models include `qwen3.5-4b-32k-fast` (32k context, `max_tokens`/`temperature`) | AssemblyAI LLM Gateway docs: https://www.assemblyai.com/docs/llm-gateway/overview ; models: https://www.assemblyai.com/docs/llm-gateway/available-models | 2026-10-23 | ✅ verified from official docs; **live call not run — no key available** |
 
 **Gemini 2.5 caveat (2026-10):** multiple reports indicate Google is
 retiring 2.5-series access for *newly created* API keys (`gemini-2.5-flash`
@@ -128,6 +129,9 @@ keys that still have access, but expect it to stop working for new keys.
   whisper path stays the default (near-zero marginal cost, offline);
   Deepgram is opt-in for users who want maximum accuracy — particularly
   for Telugu, where local tiny/base/small models measured 117–128% WER.
+- **Cleanup:** Deepgram has no text-edit endpoint. If AI polish is on, the
+  app uses a configured Groq, OpenAI, or Gemini key and sends only the final
+  text. If none is configured, the toggle stays off with an explanation.
 - **Status 2026-10-19:** adapter implemented and unit-tested
   (`DeepgramAdapter`, 20 provider tests green). **Live benchmark blocked:**
   the stored API key was rejected by Deepgram with 401 `INVALID_AUTH` on
@@ -151,10 +155,10 @@ keys that still have access, but expect it to stop working for new keys.
      either `"language_detection": true` or `"language_code": "<code>"`,
      plus optional `keyterms_prompt` (an array of terms).
   3. Poll `GET /v2/transcript/{id}` until `status` is `completed` (read
-     `text`) or `error` (read `error`). The app polls every second with a
-     120-second deadline.
-  4. Best effort: `DELETE /v2/transcript/{id}` after reading the text, so the
-     transcript is not left in the account longer than needed. Uploaded audio
+     `text`) or `error` (read `error`). The app polls every 250 ms, backs off
+     to every second after five seconds, and gives up after 120 seconds.
+  4. Best effort: `DELETE /v2/transcript/{id}` after reading the text, on a
+     background thread so deletion does not delay the result. Uploaded audio
      retention is governed by AssemblyAI's terms; the delete call is not a
      guarantee that the uploaded object is removed immediately.
 - **Supported models:** `universal-3-5-pro` (highest accuracy, 18 languages)
@@ -167,12 +171,18 @@ keys that still have access, but expect it to stop working for new keys.
 - **Vocabulary:** the user dictionary is sent as `keyterms_prompt` terms,
   which Universal-3.5 Pro and Universal-2 both support. Contextual `prompt`
   is not used.
-- **Cleanup:** AssemblyAI is transcription-only here. If AI polish is on, the
-  app looks for a configured Groq, OpenAI, or Gemini key and sends only the
-  final text there, exactly as it does for Deepgram.
-- **Status 2026-10-22:** adapter implemented and compiled; **no live call
-  has been made** because no AssemblyAI key was available. Treat live
-  behavior and latency as unverified until a key is connected.
+- **Cleanup:** AssemblyAI polish uses the same API key through the
+  OpenAI-compatible LLM Gateway at
+  `https://llm-gateway.assemblyai.com/v1/chat/completions`. The app sends only
+  the final text, with `authorization: <key>` and model
+  `qwen3.5-4b-32k-fast`. No separate Groq, OpenAI, or Gemini key is needed for
+  AssemblyAI. The audio still goes only to the selected transcription
+  provider.
+- **Status 2026-10-23:** transcription and LLM Gateway cleanup adapters are
+  implemented and compiled; **no live call has been made** because no
+  AssemblyAI key was available. Treat live behavior, polish quality, and
+  latency as unverified until a key is connected. The batch API plus a second
+  polish call cannot guarantee a 1.5-second end-to-end result.
 - **Pricing:** not verified — check AssemblyAI's pricing page.
 
 ## Upload disclosure
@@ -233,14 +243,18 @@ remain a separate research crate.
 - **AssemblyAI transcription** uploads the WAV, submits a Universal-3.5
   Pro/Universal-2 job, polls for completion, and best-effort deletes the
   transcript after reading it.
-- **Cleanup is vendor-independent.** Transcription and polish may use
-  different providers. If Deepgram or AssemblyAI is the transcription
-  provider, the app looks for a configured Groq, OpenAI, or Gemini key and
-  sends only the final text there. If no such key exists, deterministic
-  local cleanup still runs and the AI polish toggle stays off with an
-  explanation.
+- **Cleanup follows the selected provider when it can.** Groq, OpenAI,
+  Gemini, and AssemblyAI polish with their own key; AssemblyAI uses its LLM
+  Gateway. Deepgram has no text-edit model, so its polish needs a configured
+  Groq, OpenAI, or Gemini key. If no such key exists, deterministic local
+  cleanup still runs and the AI polish toggle stays off with an explanation.
 
 ## AI cleanup / post-processing is separate and optional
+
+**Fast Cloud**, on by default for cloud providers, skips the AI polish call so
+the deterministic transcript can be inserted as soon as transcription returns.
+Turn it off in Settings to wait for AI polish. Command Mode always performs the
+requested rewrite.
 
 Transcription returns a **verbatim transcript**. Any AI-powered cleanup —
 punctuation restoration, filler-word removal, formatting, summarization —

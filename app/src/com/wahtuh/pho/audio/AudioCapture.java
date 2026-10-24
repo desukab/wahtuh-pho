@@ -165,7 +165,7 @@ public final class AudioCapture {
             r.release();
         }
         if (t != null) {
-            try { t.join(1500); } catch (InterruptedException ignored) {
+            try { t.join(600); } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
             }
         }
